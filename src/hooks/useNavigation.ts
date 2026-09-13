@@ -8,17 +8,17 @@ export function useCurrentRoute() {
       case '/':
         return 'Dashboard'
       case '/students':
-        return 'Student Directory'
+        return 'Students'
       case '/seats':
-        return 'Real-Time Seat Management'
+        return 'Seats Management'
       case '/scanner':
-        return 'Scan Station'
+        return 'Library Scanner'
       case '/sessions':
-        return 'Active Sessions'
+        return 'Sessions'
       case '/reports':
-        return 'Analytics & Reports'
+        return 'Reports & Analytics'
       case '/settings':
-        return 'System Settings'
+        return 'Settings'
       default:
         return 'Library OS'
     }

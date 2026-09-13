@@ -19,7 +19,7 @@ export interface StatMetric {
   accentColor?: string
 }
 
-export type SeatStatus = 'available' | 'occupied' | 'reserved' | 'maintenance'
+export type SeatStatus = 'free' | 'occupied' | 'maintenance'
 
 export type LibrarySeatStatus = 'free' | 'occupied' | 'maintenance'
 

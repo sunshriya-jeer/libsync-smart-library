@@ -12,7 +12,7 @@ export function QuickScanCard() {
     <Card className="h-full flex flex-col justify-between">
       <CardHeader
         title="Quick Scan"
-        subtitle="Rapid QR entry for student check-ins and seat reservation"
+        subtitle="Rapid QR entry for student check-ins and seat assignment"
         action={
           <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
@@ -97,7 +97,7 @@ export function QuickScanCard() {
           </div>
           <div className="flex items-center gap-2 p-2 rounded-lg bg-slate-50 border border-slate-100">
             <RefreshCw className="w-4 h-4 text-indigo-600 shrink-0" />
-            <span className="truncate">Auto-syncs seat map</span>
+            <span className="truncate">Updates local seat map</span>
           </div>
         </div>
 

@@ -1,7 +1,9 @@
 import { Link } from 'react-router-dom'
 import { ArrowUpRight, VolumeX, Users, Laptop } from 'lucide-react'
+import type { LibrarySeatStatus } from '../../types'
 import { Card, CardHeader, CardContent } from '../ui/Card'
 import { Badge } from '../ui/Badge'
+import { INITIAL_MOCK_SEATS } from '../seats/mockSeats'
 
 interface ZoneCardData {
   id: string
@@ -14,72 +16,40 @@ interface ZoneCardData {
   availableSeats: number
   noiseLevel: 'Silent Zone' | 'Collaboration' | 'Quiet Study'
   badgeVariant: 'primary' | 'success' | 'warning'
-  sampleSeats: Array<'occupied' | 'available' | 'reserved'>
+  sampleSeats: LibrarySeatStatus[]
 }
 
-const ZONES: ZoneCardData[] = [
-  {
-    id: 'zone-a',
-    name: 'Zone A — Main Reading Room',
-    floor: 'Floor 1',
-    type: 'Quiet Study',
-    icon: VolumeX,
-    totalSeats: 80,
-    occupiedSeats: 58,
-    availableSeats: 22,
-    noiseLevel: 'Quiet Study',
-    badgeVariant: 'primary',
-    sampleSeats: [
-      'occupied', 'occupied', 'available', 'occupied', 'available',
-      'occupied', 'available', 'occupied', 'occupied', 'occupied',
-      'available', 'occupied', 'reserved', 'occupied', 'available',
-      'occupied', 'available', 'occupied', 'occupied', 'available'
-    ],
-  },
-  {
-    id: 'zone-b',
-    name: 'Zone B — Silent Research Hall',
-    floor: 'Floor 2',
-    type: 'Silent Zone',
-    icon: Laptop,
-    totalSeats: 60,
-    occupiedSeats: 48,
-    availableSeats: 12,
-    noiseLevel: 'Silent Zone',
-    badgeVariant: 'warning',
-    sampleSeats: [
-      'occupied', 'occupied', 'occupied', 'occupied', 'available',
-      'occupied', 'occupied', 'occupied', 'occupied', 'reserved',
-      'occupied', 'available', 'occupied', 'occupied', 'occupied',
-      'available', 'occupied', 'occupied', 'occupied', 'available'
-    ],
-  },
-  {
-    id: 'zone-c',
-    name: 'Zone C — Collaborative Hub',
-    floor: 'Floor 3',
-    type: 'Collaboration',
-    icon: Users,
-    totalSeats: 60,
-    occupiedSeats: 36,
-    availableSeats: 24,
-    noiseLevel: 'Collaboration',
-    badgeVariant: 'success',
-    sampleSeats: [
-      'available', 'available', 'occupied', 'occupied', 'available',
-      'available', 'occupied', 'occupied', 'available', 'available',
-      'occupied', 'occupied', 'available', 'available', 'occupied',
-      'occupied', 'available', 'available', 'occupied', 'available'
-    ],
-  },
-]
+const ZONES: ZoneCardData[] = (['A', 'B', 'C', 'D'] as const).map((section) => {
+  const sectionSeats = INITIAL_MOCK_SEATS.filter((seat) => seat.section === section)
+  const Icon = section === 'C' ? Users : section === 'B' ? Laptop : VolumeX
+  const occupiedSeats = sectionSeats.filter((seat) => seat.status === 'occupied').length
+  return {
+    id: `section-${section.toLowerCase()}`,
+    name: `Section ${section}`,
+    floor: `Library section ${section}`,
+    type: section === 'C' ? 'Collaboration' : 'Quiet Study',
+    icon: Icon,
+    totalSeats: sectionSeats.length,
+    occupiedSeats,
+    availableSeats: sectionSeats.filter((seat) => seat.status === 'free').length,
+    noiseLevel: section === 'C' ? 'Collaboration' : section === 'B' ? 'Silent Zone' : 'Quiet Study',
+    badgeVariant: section === 'C' ? 'success' : section === 'B' ? 'warning' : 'primary',
+    sampleSeats: sectionSeats.map((seat) => seat.status),
+  }
+})
 
 export function LiveSeatMapPreview() {
+  const totals = ZONES.reduce((summary, zone) => ({
+    total: summary.total + zone.totalSeats,
+    occupied: summary.occupied + zone.occupiedSeats,
+    available: summary.available + zone.availableSeats,
+  }), { total: 0, occupied: 0, available: 0 })
+
   return (
     <Card className="h-full flex flex-col">
       <CardHeader
         title="Live Seat Map"
-        subtitle="Real-time occupancy across library study wings"
+        subtitle="Current occupancy across library sections"
         action={
           <Link
             to="/seats"
@@ -96,20 +66,20 @@ export function LiveSeatMapPreview() {
         <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500 pb-2 border-b border-slate-100">
           <div className="flex items-center gap-1.5">
             <span className="w-2.5 h-2.5 rounded-sm bg-emerald-500" />
-            <span>Available ({58})</span>
+            <span>Available ({totals.available})</span>
           </div>
           <div className="flex items-center gap-1.5">
             <span className="w-2.5 h-2.5 rounded-sm bg-indigo-600" />
-            <span>Occupied ({142})</span>
+            <span>Occupied ({totals.occupied})</span>
           </div>
           <div className="flex items-center gap-1.5">
             <span className="w-2.5 h-2.5 rounded-sm bg-amber-400" />
-            <span>Reserved ({8})</span>
+            <span>Maintenance ({totals.total - totals.occupied - totals.available})</span>
           </div>
         </div>
 
         {/* Zones Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
           {ZONES.map((zone) => {
             const Icon = zone.icon
             const occupancyPercent = Math.round(
@@ -167,7 +137,7 @@ export function LiveSeatMapPreview() {
                       <div
                         key={idx}
                         className={`h-2 rounded-xs transition-opacity ${
-                          seatStatus === 'available'
+                          seatStatus === 'free'
                             ? 'bg-emerald-500'
                             : seatStatus === 'occupied'
                             ? 'bg-indigo-600'
@@ -185,8 +155,8 @@ export function LiveSeatMapPreview() {
 
         {/* Live sync telemetry note */}
         <div className="text-xs text-slate-400 flex items-center justify-between pt-1">
-          <span>* Map auto-refreshes every 30 seconds via LibSync real-time channel.</span>
-          <span className="text-slate-500 font-medium">Synced 1m ago</span>
+          <span>* Seat map reflects the current local mock inventory.</span>
+          <span className="text-slate-500 font-medium">Local snapshot</span>
         </div>
       </CardContent>
     </Card>

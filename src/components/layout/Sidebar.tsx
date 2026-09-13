@@ -1,4 +1,5 @@
 import { NavLink } from 'react-router-dom'
+import { useState } from 'react'
 import {
   LayoutDashboard,
   Users,
@@ -12,6 +13,8 @@ import {
   BookOpenCheck,
 } from 'lucide-react'
 import { cn } from '../../utils/cn'
+import { INITIAL_MOCK_SEATS } from '../seats/mockSeats'
+import { INITIAL_MOCK_STUDENTS } from '../students/mockStudents'
 
 interface SidebarProps {
   className?: string
@@ -29,13 +32,13 @@ const NAV_LINKS = [
     name: 'Students',
     path: '/students',
     icon: Users,
-    badge: '142',
+    badge: String(INITIAL_MOCK_STUDENTS.filter((student) => student.status === 'inside').length),
   },
   {
     name: 'Seats',
     path: '/seats',
     icon: Armchair,
-    badge: '58 free',
+    badge: `${INITIAL_MOCK_SEATS.filter((seat) => seat.status === 'free').length} free`,
   },
   {
     name: 'Scanner',
@@ -65,9 +68,10 @@ const NAV_LINKS = [
 ]
 
 export function Sidebar({ className, onNavigate }: SidebarProps) {
+  const [notice, setNotice] = useState('')
+
   const handleLogoutClick = () => {
-    // UI only as required
-    alert('LibSync: Logout functionality will be linked with Supabase Auth in upcoming tasks.')
+    setNotice('Logout is UI-only in this frontend milestone.')
   }
 
   return (
@@ -162,14 +166,20 @@ export function Sidebar({ className, onNavigate }: SidebarProps) {
         <div className="flex items-center justify-between font-medium text-slate-700 mb-1">
           <span className="flex items-center gap-1.5">
             <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
-            Live Library State
+            Local Library State
           </span>
           <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
         </div>
         <p className="text-slate-500 text-[11px] leading-relaxed">
-          Real-time seat synchronizer active. 142/200 seats occupied.
+          Local seat snapshot: {INITIAL_MOCK_SEATS.filter((seat) => seat.status === 'occupied').length}/{INITIAL_MOCK_SEATS.length} occupied.
         </p>
       </div>
+
+      {notice && (
+        <div className="mx-3 mb-2 rounded-lg border border-indigo-100 bg-indigo-50 px-3 py-2 text-[11px] text-indigo-700" role="status">
+          {notice}
+        </div>
+      )}
 
       {/* Footer / Logout Button UI */}
       <div className="p-3 border-t border-slate-100">

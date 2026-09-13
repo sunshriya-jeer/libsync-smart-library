@@ -1,6 +1,8 @@
 import { Menu, Search, Bell, ShieldCheck, ChevronDown } from 'lucide-react'
+import { useState } from 'react'
 import { useCurrentRoute } from '../../hooks/useNavigation'
 import { Badge } from '../ui/Badge'
+import { INITIAL_MOCK_SEATS } from '../seats/mockSeats'
 
 interface HeaderProps {
   onOpenMobileMenu: () => void
@@ -8,6 +10,9 @@ interface HeaderProps {
 
 export function Header({ onOpenMobileMenu }: HeaderProps) {
   const { pageTitle } = useCurrentRoute()
+  const [notificationOpen, setNotificationOpen] = useState(false)
+  const occupiedSeats = INITIAL_MOCK_SEATS.filter((seat) => seat.status === 'occupied').length
+  const occupancy = Math.round((occupiedSeats / INITIAL_MOCK_SEATS.length) * 100)
 
   return (
     <header className="sticky top-0 z-20 bg-white/95 backdrop-blur-xs border-b border-slate-200/80 px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
@@ -37,11 +42,11 @@ export function Header({ onOpenMobileMenu }: HeaderProps) {
       {/* Middle/Status section */}
       <div className="hidden md:flex items-center gap-2">
         <Badge variant="success" dot size="sm">
-          Live Sync Active
+          Local Mock Active
         </Badge>
         <span className="text-xs text-slate-400">•</span>
         <Badge variant="default" size="sm">
-          Occupancy: 71%
+          Occupancy: {occupancy}%
         </Badge>
       </div>
 
@@ -65,12 +70,17 @@ export function Header({ onOpenMobileMenu }: HeaderProps) {
             type="button"
             className="p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer relative"
             aria-label="View notifications"
-            onClick={() => alert('LibSync: System notifications feed will be connected.')}
+            onClick={() => setNotificationOpen((current) => !current)}
           >
             <Bell className="w-4 h-4" />
             <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-indigo-600 ring-2 ring-white" />
           </button>
         </div>
+        {notificationOpen && (
+          <div className="absolute right-4 top-14 z-30 w-64 rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-600 shadow-lg" role="status">
+            Notifications are UI-only in this frontend milestone.
+          </div>
+        )}
 
         {/* User Profile Summary (UI only) */}
         <div className="flex items-center gap-2.5 pl-2 border-l border-slate-200/80">

@@ -26,7 +26,7 @@ export function DashboardPage() {
           </h1>
 
           <p className="text-xs sm:text-sm text-slate-500 font-medium">
-            <span className="text-indigo-600 font-semibold">LibSync</span> — Scan. Sit. Study. Sync. Real-time seat allocation &amp; student flow.
+            <span className="text-indigo-600 font-semibold">LibSync</span> — Scan. Sit. Study. Sync. Local seat allocation &amp; student flow.
           </p>
         </div>
 
