@@ -35,6 +35,8 @@ export interface LibrarySeat {
 
 export type LibrarySessionStatus = 'active' | 'completed'
 
+export type ReportPeriod = 'today' | 'sevenDays' | 'thirtyDays'
+
 export interface LibrarySession {
   id: string
   studentId: string
