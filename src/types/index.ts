@@ -33,6 +33,21 @@ export interface LibrarySeat {
   entryTime?: string
 }
 
+export type LibrarySessionStatus = 'active' | 'completed'
+
+export interface LibrarySession {
+  id: string
+  studentId: string
+  studentName: string
+  department: string
+  seatNumber: string
+  section: 'A' | 'B' | 'C' | 'D'
+  entryTime: string
+  exitTime?: string
+  durationMinutes?: number
+  status: LibrarySessionStatus
+}
+
 export interface SeatZonePreview {
   id: string
   name: string
