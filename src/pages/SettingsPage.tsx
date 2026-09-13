@@ -1,122 +1,61 @@
-import { Database, Check } from 'lucide-react'
-import { Card, CardHeader, CardContent } from '../components/ui/Card'
+import { useState } from 'react'
+import { CheckCircle2, RotateCcw, Save, Settings2 } from 'lucide-react'
+import { Card, CardContent, CardHeader } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { Badge } from '../components/ui/Badge'
+import { AdminProfile } from '../components/settings/AdminProfile'
+import { EditProfileModal } from '../components/settings/EditProfileModal'
+import { LibraryInformation } from '../components/settings/LibraryInformation'
+import { LibraryPreferences } from '../components/settings/LibraryPreferences'
+import { SeatConfiguration } from '../components/settings/SeatConfiguration'
+import { SettingsNavigation, type SettingsSection } from '../components/settings/SettingsNavigation'
+import { INITIAL_MOCK_SETTINGS, getSeatCounts, type MockSettings } from '../components/settings/mockSettings'
+import { INITIAL_MOCK_SEATS } from '../components/seats/mockSeats'
 
 export function SettingsPage() {
-  return (
-    <div className="space-y-6 max-w-4xl">
-      <div>
-        <h2 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
-          System Settings
-        </h2>
-        <p className="text-xs sm:text-sm text-slate-500 mt-1">
-          Configure library parameters, seat timeout policies, and hardware scanner connectivity.
-        </p>
-      </div>
+  const [draft, setDraft] = useState<MockSettings>(INITIAL_MOCK_SETTINGS)
+  const [activeSection, setActiveSection] = useState<SettingsSection>('library')
+  const [errors, setErrors] = useState<Record<string, string>>({})
+  const [successMessage, setSuccessMessage] = useState('')
+  const [showReset, setShowReset] = useState(false)
+  const [showProfile, setShowProfile] = useState(false)
+  const counts = getSeatCounts(INITIAL_MOCK_SEATS)
 
-      <Card>
-        <CardHeader
-          title="Library Facility Configuration"
-          subtitle="Core capacity limits and operating rules"
-        />
-        <CardContent className="space-y-5">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
-                Facility Name
-              </label>
-              <input
-                type="text"
-                defaultValue="Main Campus Central Library"
-                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-900"
-              />
-            </div>
+  const updateLibrary = (field: keyof MockSettings['library'], value: string | Record<'A' | 'B' | 'C' | 'D', boolean>) => setDraft((current) => ({ ...current, library: { ...current.library, [field]: value } }))
+  const updatePreference = (field: keyof MockSettings['preferences'], value: boolean) => setDraft((current) => ({ ...current, preferences: { ...current.preferences, [field]: value } }))
 
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
-                Total Seat Capacity
-              </label>
-              <input
-                type="number"
-                defaultValue={200}
-                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-900"
-              />
-            </div>
-          </div>
+  const validate = () => {
+    const nextErrors: Record<string, string> = {}
+    const library = draft.library
+    if (!library.libraryName.trim()) nextErrors.libraryName = 'Library name is required.'
+    if (!library.libraryCode.trim()) nextErrors.libraryCode = 'Library code is required.'
+    if (!/^\S+@\S+\.\S+$/.test(library.contactEmail)) nextErrors.contactEmail = 'Enter a valid contact email.'
+    if (!library.openingTime) nextErrors.openingTime = 'Opening time is required.'
+    if (!library.closingTime) nextErrors.closingTime = 'Closing time is required.'
+    setErrors(nextErrors)
+    return Object.keys(nextErrors).length === 0
+  }
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-3 border-t border-slate-100">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
-                Seat Inactivity Auto-Release
-              </label>
-              <select
-                defaultValue="15"
-                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-900"
-              >
-                <option value="10">10 minutes</option>
-                <option value="15">15 minutes (Standard)</option>
-                <option value="30">30 minutes</option>
-                <option value="60">1 hour</option>
-              </select>
-              <p className="text-[11px] text-slate-400 mt-1">
-                Seats unoccupied past this timer will revert to available.
-              </p>
-            </div>
+  const saveChanges = () => {
+    if (!validate()) { setSuccessMessage(''); setActiveSection('library'); return }
+    setSuccessMessage('Settings saved successfully.')
+  }
 
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
-                Max Daily Session Duration
-              </label>
-              <select
-                defaultValue="4"
-                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-900"
-              >
-                <option value="2">2 hours</option>
-                <option value="4">4 hours (Recommended)</option>
-                <option value="6">6 hours</option>
-                <option value="8">8 hours</option>
-              </select>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+  const resetSettings = () => {
+    setDraft(INITIAL_MOCK_SETTINGS)
+    setErrors({})
+    setSuccessMessage('Settings restored to the demo defaults.')
+    setShowReset(false)
+  }
 
-      <Card>
-        <CardHeader
-          title="Upcoming Backend &amp; Supabase Integration"
-          subtitle="Connection readiness for upcoming development stages"
-        />
-        <CardContent className="space-y-4">
-          <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/80 flex items-start gap-3">
-            <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
-              <Database className="w-4 h-4" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-semibold text-slate-900">
-                  Supabase Integration Phase
-                </span>
-                <Badge variant="outline" size="sm">Pending Next Task</Badge>
-              </div>
-              <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                Supabase database tables (profiles, seats, sessions, attendance_logs) and real-time WebSocket broadcast channels will be connected in subsequent implementation phases.
-              </p>
-            </div>
-          </div>
+  const saveProfile = (profile: MockSettings['admin']) => {
+    const next = { ...draft, admin: profile }
+    setDraft(next)
+    setShowProfile(false)
+    setSuccessMessage('Administrator profile updated.')
+  }
 
-          <div className="flex justify-end pt-2">
-            <Button
-              variant="primary"
-              size="md"
-              icon={<Check className="w-4 h-4" />}
-              onClick={() => alert('LibSync: Settings saved (UI state only).')}
-            >
-              Save Configuration
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  )
+  return <div className="space-y-6"><div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center"><div><div className="flex items-center gap-2"><Badge variant="primary" size="sm">Administration</Badge><span className="text-xs text-slate-400">•</span><span className="text-xs font-medium text-slate-500">Local configuration</span></div><h2 className="mt-1 text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">Settings</h2><p className="mt-1 text-xs text-slate-500 sm:text-sm">Manage library configuration, preferences, and administrator settings.</p></div><div className="flex gap-2"><Button type="button" variant="outline" size="md" icon={<RotateCcw className="h-4 w-4" />} onClick={() => setShowReset(true)}>Reset</Button><Button type="button" variant="primary" size="md" icon={<Save className="h-4 w-4" />} onClick={saveChanges}>Save Changes</Button></div></div>{successMessage && <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3.5 text-sm text-emerald-800"><CheckCircle2 className="h-4 w-4" />{successMessage}</div>}<div className="grid grid-cols-1 gap-6 lg:grid-cols-[220px_1fr]"><SettingsNavigation activeSection={activeSection} onChange={setActiveSection} /><div className="min-w-0">{activeSection === 'library' && <Card><CardHeader title="Library Information" subtitle="Basic identity and operating hours" /><CardContent><LibraryInformation value={draft.library} errors={errors} onChange={updateLibrary} /></CardContent></Card>}{activeSection === 'seats' && <Card><CardHeader title="Seat Configuration" subtitle="Capacity and section preferences from the current mock seat system" /><CardContent><SeatConfiguration value={draft.library} counts={counts} onChange={updateLibrary} /></CardContent></Card>}{activeSection === 'preferences' && <Card><CardHeader title="Library Preferences" subtitle="Local display and workflow options" /><CardContent><LibraryPreferences value={draft.preferences} onChange={updatePreference} /></CardContent></Card>}{activeSection === 'administrator' && <Card><CardHeader title="Administrator" subtitle="Demo administrator profile for this local workspace" /><CardContent><AdminProfile value={draft.admin} onEdit={() => setShowProfile(true)} /></CardContent></Card>}<div className="mt-4 flex items-center gap-2 text-xs text-slate-400"><Settings2 className="h-4 w-4" />Changes are stored in local page state only.</div></div></div>{showProfile && <EditProfileModal profile={draft.admin} onClose={() => setShowProfile(false)} onSave={saveProfile} />}{showReset && <ResetConfirmation onCancel={() => setShowReset(false)} onConfirm={resetSettings} />}</div>
 }
+
+function ResetConfirmation({ onCancel, onConfirm }: { onCancel: () => void; onConfirm: () => void }) { return <div className="fixed inset-0 z-50 flex items-center justify-center p-4"><button type="button" className="absolute inset-0 bg-slate-900/40 backdrop-blur-2xs" onClick={onCancel} aria-label="Close reset confirmation" /><div role="dialog" aria-modal="true" aria-labelledby="reset-title" className="relative w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-xl"><h2 id="reset-title" className="font-semibold text-slate-900">Reset settings?</h2><p className="mt-1 text-sm leading-relaxed text-slate-500">Restore all library information, preferences, and section options to the demo defaults.</p><div className="mt-6 flex justify-end gap-2"><Button type="button" variant="outline" onClick={onCancel}>Cancel</Button><Button type="button" variant="danger" onClick={onConfirm}>Reset settings</Button></div></div></div> }
