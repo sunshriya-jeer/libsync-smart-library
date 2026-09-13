@@ -1,5 +1,5 @@
-import { SeatsPlaceholder } from '../components/seats/SeatsPlaceholder'
+import { SeatsManagement } from '../components/seats/SeatsManagement'
 
 export function SeatsPage() {
-  return <SeatsPlaceholder />
+  return <SeatsManagement />
 }

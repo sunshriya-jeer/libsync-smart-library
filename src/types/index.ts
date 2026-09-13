@@ -21,6 +21,18 @@ export interface StatMetric {
 
 export type SeatStatus = 'available' | 'occupied' | 'reserved' | 'maintenance'
 
+export type LibrarySeatStatus = 'free' | 'occupied' | 'maintenance'
+
+export interface LibrarySeat {
+  id: string
+  seatNumber: string
+  section: 'A' | 'B' | 'C' | 'D'
+  status: LibrarySeatStatus
+  studentId?: string
+  studentName?: string
+  entryTime?: string
+}
+
 export interface SeatZonePreview {
   id: string
   name: string
