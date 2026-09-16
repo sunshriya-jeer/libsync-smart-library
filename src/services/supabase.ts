@@ -8,7 +8,20 @@ if (!supabaseUrl || !supabasePublishableKey) {
   throw new Error('Missing Supabase environment variables.');
 }
 
+function normalizeSupabaseUrl(url: string): string {
+  const trimmed = url.trim();
+  try {
+    const parsed = new URL(trimmed);
+    if (parsed.pathname.includes('/rest/v1')) {
+      return parsed.origin;
+    }
+    return `${parsed.origin}${parsed.pathname.replace(/\/+$/, '')}`;
+  } catch {
+    return trimmed.replace(/\/+$/, '');
+  }
+}
+
 export const supabase = createClient(
-  supabaseUrl,
+  normalizeSupabaseUrl(supabaseUrl),
   supabasePublishableKey
 );

@@ -15,6 +15,8 @@ import {
 import { cn } from '../../utils/cn'
 import { INITIAL_MOCK_SEATS } from '../seats/mockSeats'
 import { INITIAL_MOCK_STUDENTS } from '../students/mockStudents'
+import { useAuth } from '../../hooks/useAuth'
+import { useNavigate } from 'react-router-dom'
 
 interface SidebarProps {
   className?: string
@@ -69,9 +71,21 @@ const NAV_LINKS = [
 
 export function Sidebar({ className, onNavigate }: SidebarProps) {
   const [notice, setNotice] = useState('')
+  const [isSigningOut, setIsSigningOut] = useState(false)
+  const { signOut } = useAuth()
+  const navigate = useNavigate()
 
-  const handleLogoutClick = () => {
-    setNotice('Logout is UI-only in this frontend milestone.')
+  const handleLogoutClick = async () => {
+    setIsSigningOut(true)
+    setNotice('')
+    const signOutError = await signOut()
+    setIsSigningOut(false)
+    if (signOutError) {
+      setNotice(signOutError)
+      return
+    }
+    onNavigate?.()
+    navigate('/login', { replace: true })
   }
 
   return (
@@ -186,13 +200,14 @@ export function Sidebar({ className, onNavigate }: SidebarProps) {
         <button
           type="button"
           onClick={handleLogoutClick}
+          disabled={isSigningOut}
           className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-600 hover:text-rose-700 hover:bg-rose-50/70 transition-colors cursor-pointer group"
           title="Sign out of LibSync"
         >
           <LogOut className="w-4 h-4 text-slate-400 group-hover:text-rose-600 transition-colors shrink-0" />
-          <span className="flex-1 text-left font-medium">Log out</span>
+          <span className="flex-1 text-left font-medium">{isSigningOut ? 'Signing out...' : 'Log out'}</span>
           <span className="text-[11px] text-slate-400 bg-slate-100 group-hover:bg-rose-100/60 group-hover:text-rose-700 px-1.5 py-0.5 rounded">
-            UI only
+            {isSigningOut ? 'Please wait' : 'Secure'}
           </span>
         </button>
       </div>
