@@ -72,7 +72,7 @@ const NAV_LINKS = [
 export function Sidebar({ className, onNavigate }: SidebarProps) {
   const [notice, setNotice] = useState('')
   const [isSigningOut, setIsSigningOut] = useState(false)
-  const { signOut } = useAuth()
+  const { signOut, profile } = useAuth()
   const navigate = useNavigate()
 
   const handleLogoutClick = async () => {
@@ -87,6 +87,13 @@ export function Sidebar({ className, onNavigate }: SidebarProps) {
     onNavigate?.()
     navigate('/login', { replace: true })
   }
+
+  const roleNavLinks = NAV_LINKS.filter((item) => {
+    if (item.path === '/settings' && profile?.role !== 'admin') {
+      return false
+    }
+    return true
+  })
 
   return (
     <aside
@@ -106,8 +113,8 @@ export function Sidebar({ className, onNavigate }: SidebarProps) {
               <span className="font-bold text-slate-900 tracking-tight text-lg leading-tight">
                 LibSync
               </span>
-              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-indigo-50 text-indigo-700">
-                v1.0
+              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-indigo-50 text-indigo-700 uppercase">
+                {profile?.role === 'librarian' ? 'Ops' : 'Admin'}
               </span>
             </div>
             <p className="text-[11px] font-medium text-slate-400 tracking-tight truncate mt-0.5">
@@ -119,11 +126,14 @@ export function Sidebar({ className, onNavigate }: SidebarProps) {
 
       {/* Main Navigation Links */}
       <div className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
-        <div className="px-3 pb-2 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
-          Library Management
+        <div className="px-3 pb-2 text-[11px] font-semibold text-slate-400 uppercase tracking-wider flex items-center justify-between">
+          <span>{profile?.role === 'librarian' ? 'Librarian Desk' : 'Administration'}</span>
+          <span className="text-[10px] font-semibold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded capitalize">
+            {profile?.role ?? 'admin'}
+          </span>
         </div>
 
-        {NAV_LINKS.map((item) => {
+        {roleNavLinks.map((item) => {
           const Icon = item.icon
           return (
             <NavLink

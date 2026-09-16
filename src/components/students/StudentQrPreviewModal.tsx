@@ -47,9 +47,9 @@ export function StudentQrPreviewModal({ student, onClose }: StudentQrPreviewModa
             {QR_PATTERN.join('').split('').map((cell, index) => <span key={index} className={cell === '1' ? 'bg-slate-900' : 'bg-white'} />)}
           </div>
           <div className="text-center">
-            <p className="font-semibold text-slate-900">{student.fullName}</p>
-            <p className="mt-1 font-mono text-xs text-slate-500">{student.id}</p>
-            <p className="mt-3 text-[11px] text-slate-400">Visual placeholder • Token: {student.qrToken}</p>
+            <p className="font-semibold text-slate-900">{student.fullName || student.full_name}</p>
+            <p className="mt-1 font-mono text-xs text-slate-500">{student.student_id || student.id}</p>
+            <p className="mt-3 text-[11px] text-slate-400">Visual placeholder pass • Not official college barcode</p>
           </div>
           <Button type="button" variant="primary" className="w-full" icon={<Printer className="h-4 w-4" />} onClick={onClose}>Print Pass</Button>
         </div>

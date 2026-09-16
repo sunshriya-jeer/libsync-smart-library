@@ -89,10 +89,10 @@ export function ResetPasswordPage() {
   }
 
   const handleGoToDashboard = () => {
-    navigate('/', { replace: true })
+    navigate(profile?.role === 'student' ? '/student' : '/', { replace: true })
   }
 
-  const canGoToDashboard = Boolean(session && (profile?.role === 'admin' || profile?.role === 'librarian'))
+  const canGoToDashboard = Boolean(session && profile?.role)
 
   return (
     <main className="min-h-screen bg-slate-50 px-4 py-10 text-slate-900 sm:px-6">

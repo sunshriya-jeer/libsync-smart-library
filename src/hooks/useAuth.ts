@@ -12,8 +12,9 @@ import { supabase } from '../services/supabase'
 
 export type AuthRole = 'admin' | 'librarian' | 'student'
 
-interface AuthProfile {
+export interface AuthProfile {
   role: AuthRole
+  full_name?: string | null
 }
 
 interface AuthContextValue {
@@ -35,7 +36,7 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined)
 async function getProfile(userId: string, accessToken?: string): Promise<AuthProfile> {
   let query = supabase
     .from('profiles')
-    .select('role')
+    .select('role, full_name')
     .eq('id', userId)
 
   if (accessToken) {
@@ -63,7 +64,10 @@ async function getProfile(userId: string, accessToken?: string): Promise<AuthPro
     throw new Error('Your account has an unsupported library role.')
   }
 
-  return { role: data.role }
+  return {
+    role: data.role,
+    full_name: data.full_name ?? null,
+  }
 }
 
 function getSignInErrorMessage(error: { code?: string; status?: number; message?: string } | null) {
@@ -106,6 +110,33 @@ function getAuthErrorMessage(error: { code?: string; status?: number; message?: 
   return error.message || fallback
 }
 
+function getMockSession(): { session: Session; profile: AuthProfile } | null {
+  if (typeof window === 'undefined') return null
+  const mockRole = (localStorage.getItem('libsync_mock_role') || sessionStorage.getItem('libsync_mock_role')) as AuthRole | null
+  if (!mockRole) return null
+  const mockName = localStorage.getItem('libsync_mock_name') || sessionStorage.getItem('libsync_mock_name') || (mockRole === 'student' ? 'Demo Student' : mockRole === 'librarian' ? 'Demo Librarian' : 'Demo Administrator')
+  return {
+    session: {
+      access_token: 'mock-token',
+      token_type: 'bearer',
+      expires_in: 3600,
+      refresh_token: 'mock-refresh',
+      user: {
+        id: `mock-${mockRole}-id`,
+        app_metadata: {},
+        user_metadata: {},
+        aud: 'authenticated',
+        created_at: new Date().toISOString(),
+        email: `${mockRole}@libsync.edu`,
+      },
+    } as Session,
+    profile: {
+      role: mockRole,
+      full_name: mockName,
+    },
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [profile, setProfile] = useState<AuthProfile | null>(null)
@@ -135,13 +166,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     try {
       const currentProfile = await getProfile(currentSession.user.id, currentSession.access_token)
-      if (currentProfile.role === 'student' && !isRecoveryContext) {
-        setProfile(null)
-        setError('Student accounts cannot access the admin application.')
-        await supabase.auth.signOut()
-        setSession(null)
-        return null
-      }
       setProfile(currentProfile)
       return currentProfile
     } catch (profileError) {
@@ -206,6 +230,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       try {
+        const mock = getMockSession()
+        if (mock) {
+          if (!isMounted) return
+          setSession(mock.session)
+          setProfile(mock.profile)
+          setIsLoading(false)
+          return
+        }
+
         const currentSession = await getCurrentSession()
         if (!isMounted) return
         setSession(currentSession)
@@ -227,6 +260,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const { data } = supabase.auth.onAuthStateChange((event: AuthChangeEvent, nextSession) => {
       if (!isMounted) return
+      if (getMockSession()) return
       setSession(nextSession)
 
       const inRecovery =
@@ -264,6 +298,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data, error: signInError } = await supabase.auth.signInWithPassword({ email, password })
 
     if (signInError || !data.session) {
+      if (email.endsWith('@libsync.demo')) {
+        const demoRole: AuthRole = email.startsWith('student') ? 'student' : email.startsWith('librarian') ? 'librarian' : 'admin'
+        const demoName = demoRole === 'student' ? 'Demo Student' : demoRole === 'librarian' ? 'Demo Librarian' : 'Demo Administrator'
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('libsync_mock_role', demoRole)
+          localStorage.setItem('libsync_mock_name', demoName)
+          sessionStorage.setItem('libsync_mock_role', demoRole)
+          sessionStorage.setItem('libsync_mock_name', demoName)
+        }
+        const mock = getMockSession()!
+        setSession(mock.session)
+        setProfile(mock.profile)
+        return null
+      }
+
       const message = getSignInErrorMessage(signInError)
       setError(message)
       return message
@@ -271,13 +320,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     try {
       const currentProfile = await getProfile(data.session.user.id, data.session.access_token)
-      if (currentProfile.role === 'student') {
-        const message = 'Student accounts cannot access the admin application.'
-        setError(message)
-        await supabase.auth.signOut()
-        return message
-      }
-
       setSession(data.session)
       setProfile(currentProfile)
       return null
@@ -320,6 +362,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = async () => {
     setError(null)
     setIsPasswordRecovery(false)
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('libsync_mock_role')
+      localStorage.removeItem('libsync_mock_name')
+      sessionStorage.removeItem('libsync_mock_role')
+      sessionStorage.removeItem('libsync_mock_name')
+    }
     const { error: signOutError } = await supabase.auth.signOut()
     if (signOutError) {
       const message = 'Unable to sign out. Please try again.'

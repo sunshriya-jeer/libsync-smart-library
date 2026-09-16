@@ -82,15 +82,38 @@ export type StudentStatus = 'inside' | 'active' | 'inactive'
 
 export interface Student {
   id: string
-  qrToken: string
+  student_id?: string
+  studentId?: string
+  qrToken?: string
+  qr_token?: string
   fullName: string
+  full_name?: string
   email: string
   department: string
-  year: string
-  division: string
+  year?: string
+  division?: string | null
   status: StudentStatus
   currentSeat?: string | null
-  joinedDate: string
+  joinedDate?: string
+  created_at?: string
+  updated_at?: string
   lastVisit?: string
+  college_barcode: string | null
 }
+
+export interface StudentRow {
+  id: string
+  student_id: string
+  full_name: string
+  department: string
+  year: number
+  division: string | null
+  email: string | null
+  qr_token: string
+  status: string
+  created_at: string
+  updated_at: string
+  college_barcode: string | null
+}
+
 

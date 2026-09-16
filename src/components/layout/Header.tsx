@@ -1,6 +1,7 @@
 import { Menu, Search, Bell, ShieldCheck, ChevronDown } from 'lucide-react'
 import { useState } from 'react'
 import { useCurrentRoute } from '../../hooks/useNavigation'
+import { useAuth } from '../../hooks/useAuth'
 import { Badge } from '../ui/Badge'
 import { INITIAL_MOCK_SEATS } from '../seats/mockSeats'
 
@@ -10,9 +11,18 @@ interface HeaderProps {
 
 export function Header({ onOpenMobileMenu }: HeaderProps) {
   const { pageTitle } = useCurrentRoute()
+  const { profile, session } = useAuth()
   const [notificationOpen, setNotificationOpen] = useState(false)
   const occupiedSeats = INITIAL_MOCK_SEATS.filter((seat) => seat.status === 'occupied').length
   const occupancy = Math.round((occupiedSeats / INITIAL_MOCK_SEATS.length) * 100)
+
+  const roleTitle = profile?.role === 'librarian'
+    ? 'Librarian Desk'
+    : profile?.role === 'student'
+    ? 'Student Account'
+    : 'Administrator'
+
+  const userSubtitle = profile?.full_name || session?.user.email || (profile?.role === 'librarian' ? 'Operations' : 'Admin Portal')
 
   return (
     <header className="sticky top-0 z-20 bg-white/95 backdrop-blur-xs border-b border-slate-200/80 px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
@@ -82,7 +92,7 @@ export function Header({ onOpenMobileMenu }: HeaderProps) {
           </div>
         )}
 
-        {/* User Profile Summary (UI only) */}
+        {/* User Profile Summary */}
         <div className="flex items-center gap-2.5 pl-2 border-l border-slate-200/80">
           <div className="w-8 h-8 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-700 font-semibold text-xs shrink-0">
             <ShieldCheck className="w-4 h-4 text-indigo-600" />
@@ -90,10 +100,10 @@ export function Header({ onOpenMobileMenu }: HeaderProps) {
 
           <div className="hidden sm:block text-left">
             <div className="text-xs font-semibold text-slate-900 leading-tight">
-              Librarian Desk
+              {roleTitle}
             </div>
-            <div className="text-[11px] text-slate-400 leading-tight">
-              Admin Session
+            <div className="text-[11px] text-slate-400 leading-tight max-w-[140px] truncate">
+              {userSubtitle}
             </div>
           </div>
 

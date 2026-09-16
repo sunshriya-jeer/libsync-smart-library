@@ -1,4 +1,4 @@
-import { Mail, MapPin, X } from 'lucide-react'
+import { Mail, MapPin, ScanBarcode, X } from 'lucide-react'
 import type { ReactNode } from 'react'
 import type { Student } from '../../types'
 import { Button } from '../ui/Button'
@@ -13,6 +13,8 @@ interface StudentDetailsModalProps {
 export function StudentDetailsModal({ student, onClose }: StudentDetailsModalProps) {
   if (!student) return null
 
+  const studentDisplayId = student.student_id || student.id
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <button type="button" className="absolute inset-0 bg-slate-900/40 backdrop-blur-2xs" onClick={onClose} aria-label="Close student details" />
@@ -20,8 +22,8 @@ export function StudentDetailsModal({ student, onClose }: StudentDetailsModalPro
         <div className="flex items-start justify-between border-b border-slate-100 bg-slate-50/60 p-5 sm:p-6">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wider text-indigo-600">Student profile</p>
-            <h2 id="student-details-title" className="mt-1 text-lg font-bold tracking-tight text-slate-900">{student.fullName}</h2>
-            <p className="mt-0.5 font-mono text-xs text-slate-500">{student.id}</p>
+            <h2 id="student-details-title" className="mt-1 text-lg font-bold tracking-tight text-slate-900">{student.fullName || student.full_name}</h2>
+            <p className="mt-0.5 font-mono text-xs text-slate-500">{studentDisplayId}</p>
           </div>
           <button type="button" onClick={onClose} className="rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700" aria-label="Close student details">
             <X className="h-5 w-5" />
@@ -30,11 +32,13 @@ export function StudentDetailsModal({ student, onClose }: StudentDetailsModalPro
         <Card className="rounded-none border-0 shadow-none">
           <CardContent className="grid grid-cols-1 gap-4 p-5 sm:grid-cols-2 sm:p-6">
             <div className="sm:col-span-2"><StudentStatusBadge status={student.status} /></div>
-            <DetailItem label="Email" value={student.email} icon={<Mail className="h-4 w-4" />} />
+            <DetailItem label="Student ID / PRN" value={studentDisplayId} />
+            <DetailItem label="College Barcode" value={student.college_barcode || 'Not assigned'} icon={<ScanBarcode className="h-4 w-4 text-slate-500" />} />
+            <DetailItem label="Email" value={student.email || 'Not provided'} icon={<Mail className="h-4 w-4" />} />
             <DetailItem label="Department" value={student.department} />
-            <DetailItem label="Academic year" value={`${student.year} • ${student.division}`} />
+            <DetailItem label="Division" value={student.division || '—'} />
             <DetailItem label="Current seat" value={student.currentSeat ?? 'Not checked in'} icon={<MapPin className="h-4 w-4" />} />
-            <DetailItem label="Joined" value={student.joinedDate} />
+            <DetailItem label="Joined" value={student.joinedDate || 'Recently'} />
             <DetailItem label="Last visit" value={student.lastVisit ?? 'No visits recorded'} />
           </CardContent>
         </Card>

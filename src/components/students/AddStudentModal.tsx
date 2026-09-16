@@ -1,13 +1,39 @@
 import { useState, useEffect } from 'react'
-import { X, UserPlus, AlertCircle } from 'lucide-react'
+import { X, UserPlus, AlertCircle, Loader2 } from 'lucide-react'
 import type { Student } from '../../types'
 import { DEPARTMENTS, ACADEMIC_YEARS, DIVISIONS } from './mockStudents'
 import { Button } from '../ui/Button'
 
+export interface SaveStudentData {
+  id?: string
+  student_id: string
+  full_name: string
+  department: string
+  year: number
+  division: string | null
+  email: string | null
+  college_barcode: string | null
+}
+
+const YEAR_LABEL_TO_NUMBER: Record<string, number> = {
+  '1st Year': 1,
+  '2nd Year': 2,
+  '3rd Year': 3,
+  '4th Year': 4,
+}
+
+function parseYearToNumber(yearVal: string): number {
+  if (YEAR_LABEL_TO_NUMBER[yearVal]) {
+    return YEAR_LABEL_TO_NUMBER[yearVal]
+  }
+  const parsed = parseInt(yearVal, 10)
+  return isNaN(parsed) ? 1 : parsed
+}
+
 interface AddStudentModalProps {
   isOpen: boolean
   onClose: () => void
-  onSaveStudent: (student: Student) => void
+  onSaveStudent: (data: SaveStudentData) => Promise<void> | void
   student?: Student | null
   existingStudentIds: string[]
 }
@@ -20,65 +46,74 @@ export function AddStudentModal({
   existingStudentIds,
 }: AddStudentModalProps) {
   const generateNewId = () => `STU-2026-${Math.floor(1000 + Math.random() * 9000)}`
-  const generateQrToken = () => `mock-qr-${Date.now()}-${Math.floor(Math.random() * 1000)}`
 
-  const [studentId, setStudentId] = useState(student?.id ?? generateNewId)
-  const [fullName, setFullName] = useState(student?.fullName ?? '')
-  const [email, setEmail] = useState(student?.email ?? '')
-  const [department, setDepartment] = useState<string>(student?.department ?? DEPARTMENTS[1])
-  const [year, setYear] = useState<string>(student?.year ?? ACADEMIC_YEARS[1])
-  const [division, setDivision] = useState<string>(student?.division ?? DIVISIONS[0])
+  const [studentId, setStudentId] = useState(student?.student_id || student?.id || generateNewId)
+  const [fullName, setFullName] = useState(student?.fullName || student?.full_name || '')
+  const [email, setEmail] = useState(student?.email || '')
+  const [department, setDepartment] = useState<string>(student?.department || DEPARTMENTS[1])
+  const [year, setYear] = useState<string>(student?.year || ACADEMIC_YEARS[1])
+  const [division, setDivision] = useState<string>(student?.division || DIVISIONS[0])
+  const [collegeBarcode, setCollegeBarcode] = useState<string>(student?.college_barcode || '')
   const [error, setError] = useState<string | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   // ESC key listener
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isOpen) {
+      if (e.key === 'Escape' && isOpen && !isSubmitting) {
         onClose()
       }
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [isOpen, onClose])
+  }, [isOpen, onClose, isSubmitting])
 
   if (!isOpen) return null
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!studentId.trim()) {
+    const trimmedId = studentId.trim()
+    const trimmedName = fullName.trim()
+    const trimmedEmail = email.trim()
+    const trimmedBarcode = collegeBarcode.trim()
+
+    if (!trimmedId) {
       setError('Student ID is required.')
       return
     }
-    if (existingStudentIds.includes(studentId.trim()) && studentId.trim() !== student?.id) {
+    if (!student && existingStudentIds.includes(trimmedId)) {
       setError('That Student ID is already registered.')
       return
     }
-    if (!fullName.trim()) {
+    if (!trimmedName) {
       setError('Full Name is required.')
       return
     }
-    if (!email.trim() || !email.includes('@')) {
-      setError('Please provide a valid institutional email.')
+    if (trimmedEmail && !trimmedEmail.includes('@')) {
+      setError('Please provide a valid institutional email address.')
       return
     }
 
-    const newStudent: Student = {
-      id: studentId.trim(),
-      qrToken: student?.qrToken ?? generateQrToken(),
-      fullName: fullName.trim(),
-      email: email.trim(),
-      department,
-      year,
-      division,
-      status: student?.status ?? 'active',
-      currentSeat: student?.currentSeat ?? null,
-      joinedDate: student?.joinedDate ?? 'Sep 2026',
-      lastVisit: student?.lastVisit ?? 'Never (New)',
+    try {
+      setIsSubmitting(true)
+      setError(null)
+      await onSaveStudent({
+        id: student?.id,
+        student_id: trimmedId,
+        full_name: trimmedName,
+        department,
+        year: parseYearToNumber(year),
+        division: division ? division.trim() : null,
+        email: trimmedEmail || null,
+        college_barcode: trimmedBarcode || null,
+      })
+      onClose()
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to save student record.')
+    } finally {
+      setIsSubmitting(false)
     }
-
-    onSaveStudent(newStudent)
-    onClose()
   }
 
   return (
@@ -86,7 +121,9 @@ export function AddStudentModal({
       {/* Backdrop */}
       <div
         className="fixed inset-0 bg-slate-900/40 backdrop-blur-2xs transition-opacity duration-200"
-        onClick={onClose}
+        onClick={() => {
+          if (!isSubmitting) onClose()
+        }}
         aria-hidden="true"
       />
 
@@ -119,7 +156,8 @@ export function AddStudentModal({
           <button
             type="button"
             onClick={onClose}
-            className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+            disabled={isSubmitting}
+            className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer disabled:opacity-50"
             aria-label="Close dialog"
           >
             <X className="w-5 h-5" />
@@ -150,9 +188,17 @@ export function AddStudentModal({
                 value={studentId}
                 onChange={(e) => setStudentId(e.target.value)}
                 placeholder="STU-2026-XXXX"
-                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs font-mono font-medium text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                disabled={Boolean(student)}
+                className={`w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs font-mono font-medium text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 ${
+                  student ? 'opacity-70 cursor-not-allowed bg-slate-100' : ''
+                }`}
                 required
               />
+              {student && (
+                <p className="mt-1 text-[11px] text-slate-400">
+                  Student ID cannot be changed once created.
+                </p>
+              )}
             </div>
 
             <div>
@@ -174,23 +220,44 @@ export function AddStudentModal({
             </div>
           </div>
 
-          {/* Email */}
-          <div>
-            <label
-              htmlFor="student-email"
-              className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5"
-            >
-              Institutional Email <span className="text-rose-500">*</span>
-            </label>
-            <input
-              id="student-email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="e.g. alex.morgan@campus.edu"
-              className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
-              required
-            />
+          {/* Email & College Barcode */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label
+                htmlFor="student-email"
+                className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5"
+              >
+                Institutional Email
+              </label>
+              <input
+                id="student-email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="e.g. alex.morgan@campus.edu"
+                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+              />
+            </div>
+
+            <div>
+              <label
+                htmlFor="college-barcode"
+                className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5"
+              >
+                College Barcode
+              </label>
+              <input
+                id="college-barcode"
+                type="text"
+                value={collegeBarcode}
+                onChange={(e) => setCollegeBarcode(e.target.value)}
+                placeholder="Barcode already issued by the college"
+                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs font-mono text-slate-900 placeholder:text-slate-400 placeholder:font-sans focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+              />
+              <p className="mt-1 text-[11px] text-slate-400">
+                Barcode already issued by the college.
+              </p>
+            </div>
           </div>
 
           {/* Department, Year & Division */}
@@ -221,7 +288,7 @@ export function AddStudentModal({
                 htmlFor="student-year"
                 className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5"
               >
-                Academic Year <span className="text-rose-500">*</span>
+                Academic Year
               </label>
               <select
                 id="student-year"
@@ -242,7 +309,7 @@ export function AddStudentModal({
                 htmlFor="student-division"
                 className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5"
               >
-                Division <span className="text-rose-500">*</span>
+                Division
               </label>
               <select
                 id="student-division"
@@ -250,6 +317,7 @@ export function AddStudentModal({
                 onChange={(e) => setDivision(e.target.value)}
                 className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer"
               >
+                <option value="">None / Unassigned</option>
                 {DIVISIONS.map((div) => (
                   <option key={div} value={div}>
                     {div}
@@ -260,7 +328,7 @@ export function AddStudentModal({
           </div>
 
           <div className="pt-2 text-[11px] text-slate-400">
-            * QR access is represented by a mock token until the QR workflow is connected.
+            * A temporary QR token is generated for schema compatibility. Official identity scanning uses the College Barcode.
           </div>
 
           {/* Modal Actions */}
@@ -270,6 +338,7 @@ export function AddStudentModal({
               variant="outline"
               size="md"
               onClick={onClose}
+              disabled={isSubmitting}
             >
               Cancel
             </Button>
@@ -277,9 +346,10 @@ export function AddStudentModal({
               type="submit"
               variant="primary"
               size="md"
-              icon={<UserPlus className="w-4 h-4" />}
+              disabled={isSubmitting}
+              icon={isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
             >
-                {student ? 'Save Changes' : 'Add Student'}
+              {isSubmitting ? 'Saving...' : student ? 'Save Changes' : 'Add Student'}
             </Button>
           </div>
         </form>

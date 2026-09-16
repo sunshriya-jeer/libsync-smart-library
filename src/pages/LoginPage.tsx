@@ -23,8 +23,13 @@ export function LoginPage() {
     return <AuthLoading />
   }
 
-  if (session && (profile?.role === 'admin' || profile?.role === 'librarian')) {
-    return <Navigate to="/" replace />
+  if (session) {
+    if (profile?.role === 'student') {
+      return <Navigate to="/student" replace />
+    }
+    if (profile?.role === 'admin' || profile?.role === 'librarian') {
+      return <Navigate to="/" replace />
+    }
   }
 
   const toggleForgotPassword = () => {

@@ -19,6 +19,14 @@ export function useCurrentRoute() {
         return 'Reports & Analytics'
       case '/settings':
         return 'Settings'
+      case '/student':
+        return 'Student Home'
+      case '/student/scan':
+        return 'Student QR Pass'
+      case '/student/seat':
+        return 'Seat Assignment'
+      case '/student/history':
+        return 'Visit History'
       default:
         return 'Library OS'
     }
