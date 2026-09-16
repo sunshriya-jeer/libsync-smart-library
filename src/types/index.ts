@@ -116,4 +116,26 @@ export interface StudentRow {
   college_barcode: string | null
 }
 
+export interface SeatRow {
+  id: string
+  seat_number: string
+  section: string
+  status: string
+  created_at: string
+  updated_at: string
+}
+
+export interface LibrarySessionRow {
+  id: string
+  student_id: string
+  seat_id: string
+  entry_time: string
+  exit_time: string | null
+  status: string
+  created_at: string
+  updated_at: string
+  students?: StudentRow | null
+  seats?: SeatRow | null
+}
+
 

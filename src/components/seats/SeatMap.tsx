@@ -11,7 +11,7 @@ export function SeatMap({ seats, onSeatClick }: SeatMapProps) {
   const sections = ['A', 'B', 'C', 'D']
   return (
     <Card>
-      <CardHeader title="Library Seat Map" subtitle="Select any seat to view details or update its local mock status." action={<StatusLegend />} />
+      <CardHeader title="Library Seat Map" subtitle="Select any seat to view details or update its status." action={<StatusLegend />} />
       <CardContent className="space-y-6">
         {sections.map((section) => {
           const sectionSeats = seats.filter((seat) => seat.section === section)
