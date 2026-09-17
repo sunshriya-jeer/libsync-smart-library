@@ -138,4 +138,4 @@ export interface LibrarySessionRow {
   seats?: SeatRow | null
 }
 
-
+export type ScanAction = 'entry' | 'exit'

@@ -99,7 +99,7 @@ function handleDatabaseError(
 
 /**
  * Fetch all seats from public.seats using the authenticated session.
- * Natural sort by section and seat number.
+ * Natural sort by section and seat number. Enriches occupied seats with active session information.
  */
 export async function fetchSeats(): Promise<LibrarySeat[]> {
   const session = await getAuthenticatedSession()
@@ -117,6 +117,86 @@ export async function fetchSeats(): Promise<LibrarySeat[]> {
   const rows = (data ?? []) as SeatRow[]
 
   // Sort seats naturally (e.g., A-1, A-2 ... A-12 or A01, A02 ... A12)
+  rows.sort((a, b) => {
+    return a.seat_number.localeCompare(b.seat_number, undefined, { numeric: true, sensitivity: 'base' })
+  })
+
+  // Enrich occupied seats with active library session information
+  const occupiedSeatIds = rows.filter((r) => r.status === 'occupied').map((r) => r.id)
+  const sessionMap = new Map<string, { studentName: string; studentId: string; entryTime: string }>()
+
+  if (occupiedSeatIds.length > 0) {
+    try {
+      const { data: activeSessions } = await supabase
+        .from('library_sessions')
+        .select('id, seat_id, student_id, entry_time')
+        .setHeader('Authorization', `Bearer ${session.access_token}`)
+        .in('seat_id', occupiedSeatIds)
+        .eq('status', 'active')
+
+      if (activeSessions && activeSessions.length > 0) {
+        const studentIds = Array.from(new Set(activeSessions.map((s) => s.student_id).filter(Boolean)))
+        const studentMap = new Map<string, { name: string; studentId: string }>()
+
+        if (studentIds.length > 0) {
+          const { data: studentsData } = await supabase
+            .from('students')
+            .select('id, full_name, student_id')
+            .setHeader('Authorization', `Bearer ${session.access_token}`)
+            .in('id', studentIds)
+
+          if (studentsData) {
+            for (const s of studentsData) {
+              studentMap.set(s.id, { name: s.full_name, studentId: s.student_id })
+            }
+          }
+        }
+
+        for (const s of activeSessions) {
+          const student = studentMap.get(s.student_id)
+          sessionMap.set(s.seat_id, {
+            studentName: student?.name || 'Occupied',
+            studentId: student?.studentId || '—',
+            entryTime: s.entry_time,
+          })
+        }
+      }
+    } catch {
+      // Non-blocking enrichment failure
+    }
+  }
+
+  return rows.map((row) => {
+    const seat = mapRowToSeat(row)
+    const sessionInfo = sessionMap.get(row.id)
+    if (sessionInfo) {
+      seat.studentName = sessionInfo.studentName
+      seat.studentId = sessionInfo.studentId
+      seat.entryTime = sessionInfo.entryTime
+    }
+    return seat
+  })
+}
+
+/**
+ * Fetch available (free) seats from public.seats using the authenticated session.
+ * Database status for an available seat is 'free'.
+ */
+export async function fetchFreeSeats(): Promise<LibrarySeat[]> {
+  const session = await getAuthenticatedSession()
+
+  const { data, error } = await supabase
+    .from('seats')
+    .select('*')
+    .setHeader('Authorization', `Bearer ${session.access_token}`)
+    .eq('status', 'free')
+    .order('seat_number', { ascending: true })
+
+  if (error) {
+    throw handleDatabaseError(error, 'Failed to load available seats from the database.')
+  }
+
+  const rows = (data ?? []) as SeatRow[]
   rows.sort((a, b) => {
     return a.seat_number.localeCompare(b.seat_number, undefined, { numeric: true, sensitivity: 'base' })
   })
