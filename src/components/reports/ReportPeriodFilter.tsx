@@ -1,7 +1,7 @@
 import { CalendarDays } from 'lucide-react'
 import type { ReportPeriod } from '../../types'
 import { Button } from '../ui/Button'
-import { PERIOD_LABELS } from './mockReports'
+import { PERIOD_LABELS } from '../../services/reportService'
 
 interface ReportPeriodFilterProps {
   period: ReportPeriod
