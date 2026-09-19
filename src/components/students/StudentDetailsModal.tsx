@@ -1,9 +1,10 @@
 import { Mail, MapPin, ScanBarcode, X } from 'lucide-react'
-import type { ReactNode } from 'react'
+import { useState, useEffect, type ReactNode } from 'react'
 import type { Student } from '../../types'
 import { Button } from '../ui/Button'
 import { Card, CardContent } from '../ui/Card'
 import { StudentStatusBadge } from './StudentStatusBadge'
+import { fetchStudentVisitInfo } from '../../services/sessionService'
 
 interface StudentDetailsModalProps {
   student: Student | null
@@ -11,9 +12,55 @@ interface StudentDetailsModalProps {
 }
 
 export function StudentDetailsModal({ student, onClose }: StudentDetailsModalProps) {
+  const [loadedData, setLoadedData] = useState<{
+    studentId: string | null
+    currentSeat: string | null
+    lastVisit: string | null
+  }>({
+    studentId: null,
+    currentSeat: student?.currentSeat ?? null,
+    lastVisit: student?.lastVisit ?? null,
+  })
+
+  useEffect(() => {
+    if (!student?.id) return
+
+    let isMounted = true
+
+    fetchStudentVisitInfo(student.id)
+      .then((info) => {
+        if (!isMounted) return
+        setLoadedData({
+          studentId: student.id,
+          currentSeat: info.currentSeat,
+          lastVisit: info.lastVisit,
+        })
+      })
+      .catch((err) => {
+        if (!isMounted) return
+        console.error('[StudentDetailsModal] Failed to fetch student visit info:', err)
+        setLoadedData({
+          studentId: student.id,
+          currentSeat: null,
+          lastVisit: null,
+        })
+      })
+
+    return () => {
+      isMounted = false
+    }
+  }, [student?.id])
+
   if (!student) return null
 
+  const isLoading = loadedData.studentId !== student.id
   const studentDisplayId = student.student_id || student.id
+  const currentSeatDisplay = isLoading
+    ? 'Checking...'
+    : loadedData.currentSeat ?? 'Not checked in'
+  const lastVisitDisplay = isLoading
+    ? 'Loading...'
+    : loadedData.lastVisit ?? 'No visits recorded'
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -37,9 +84,9 @@ export function StudentDetailsModal({ student, onClose }: StudentDetailsModalPro
             <DetailItem label="Email" value={student.email || 'Not provided'} icon={<Mail className="h-4 w-4" />} />
             <DetailItem label="Department" value={student.department} />
             <DetailItem label="Division" value={student.division || '—'} />
-            <DetailItem label="Current seat" value={student.currentSeat ?? 'Not checked in'} icon={<MapPin className="h-4 w-4" />} />
+            <DetailItem label="Current seat" value={currentSeatDisplay} icon={<MapPin className="h-4 w-4" />} />
             <DetailItem label="Joined" value={student.joinedDate || 'Recently'} />
-            <DetailItem label="Last visit" value={student.lastVisit ?? 'No visits recorded'} />
+            <DetailItem label="Last visit" value={lastVisitDisplay} />
           </CardContent>
         </Card>
         <div className="flex justify-end border-t border-slate-100 p-5 sm:p-6">

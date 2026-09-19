@@ -11,3 +11,39 @@
   }
 }
 
+@media print {
+  /* Hide the rest of the application / admin layout */
+  body * {
+    visibility: hidden !important;
+  }
+
+  /* Show only the printable pass card */
+  #printable-student-pass,
+  #printable-student-pass * {
+    visibility: visible !important;
+  }
+
+  #printable-student-pass {
+    position: absolute !important;
+    left: 50% !important;
+    top: 24px !important;
+    transform: translateX(-50%) !important;
+    width: 380px !important;
+    max-width: 95vw !important;
+    margin: 0 auto !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    border: 1.5px solid #cbd5e1 !important;
+    border-radius: 16px !important;
+    box-shadow: none !important;
+    overflow: hidden !important;
+    page-break-inside: avoid !important;
+  }
+
+  /* Elements marked as no-print must be completely removed from layout */
+  .no-print {
+    display: none !important;
+  }
+}
+
+

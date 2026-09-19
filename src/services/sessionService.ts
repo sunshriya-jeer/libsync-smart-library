@@ -269,7 +269,9 @@ export async function getActiveSessionForStudent(
     .select('*')
     .setHeader('Authorization', `Bearer ${session.access_token}`)
     .eq('student_id', studentId)
-    .eq('status', 'active')
+    .is('exit_time', null)
+    .order('entry_time', { ascending: false })
+    .limit(1)
     .maybeSingle()
 
   if (sessionError) {
@@ -731,4 +733,35 @@ export async function fetchStudentSessions(
     return mapRowToLibrarySession(row, null, seat)
   })
 }
+
+export interface StudentVisitInfo {
+  currentSeat: string | null
+  lastVisit: string | null
+  latestSession?: LibrarySession | null
+  activeSession?: LibrarySession | null
+}
+
+/**
+ * Fetches real library visit information for a student from public.library_sessions and public.seats:
+ * - latestSession: the most recent session ordered by entry_time DESC (used for lastVisit)
+ * - activeSession: the current session where exit_time IS NULL (used for currentSeat)
+ */
+export async function fetchStudentVisitInfo(studentId: string): Promise<StudentVisitInfo> {
+  const [activeData, recentSessions] = await Promise.all([
+    getActiveSessionForStudent(studentId),
+    fetchStudentSessions(studentId, 1),
+  ])
+
+  const latestSession = recentSessions.length > 0 ? recentSessions[0] : null
+  const lastVisit = latestSession?.entryTime ? formatIstDateTime(latestSession.entryTime) : null
+  const currentSeat = activeData?.seat?.seatNumber || null
+
+  return {
+    currentSeat,
+    lastVisit,
+    latestSession,
+    activeSession: activeData?.session || null,
+  }
+}
+
 
