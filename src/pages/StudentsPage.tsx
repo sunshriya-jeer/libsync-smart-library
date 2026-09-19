@@ -30,9 +30,11 @@ import {
   updateStudent,
   updateStudentStatus,
 } from '../services/studentService'
+import { fetchActiveSessions } from '../services/sessionService'
 
 export function StudentsPage() {
   const [students, setStudents] = useState<Student[]>([])
+  const [insideCount, setInsideCount] = useState(0)
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [searchParams, setSearchParams] = useSearchParams()
@@ -51,8 +53,12 @@ export function StudentsPage() {
     try {
       setIsLoading(true)
       setLoadError(null)
-      const data = await fetchStudents()
+      const [data, activeData] = await Promise.all([
+        fetchStudents(),
+        fetchActiveSessions(),
+      ])
       setStudents(data)
+      setInsideCount(activeData.uniqueStudentCount)
     } catch (err: unknown) {
       console.error('[StudentsPage] Failed to fetch students:', err)
       setLoadError(
@@ -68,11 +74,15 @@ export function StudentsPage() {
   useEffect(() => {
     let isMounted = true
 
-    const fetchInitialStudents = async () => {
+    const fetchInitialData = async () => {
       try {
-        const data = await fetchStudents()
+        const [data, activeData] = await Promise.all([
+          fetchStudents(),
+          fetchActiveSessions(),
+        ])
         if (isMounted) {
           setStudents(data)
+          setInsideCount(activeData.uniqueStudentCount)
           setLoadError(null)
         }
       } catch (err: unknown) {
@@ -91,10 +101,45 @@ export function StudentsPage() {
       }
     }
 
-    void fetchInitialStudents()
+    void fetchInitialData()
+
+    const refreshActiveInside = async () => {
+      try {
+        const activeData = await fetchActiveSessions()
+        if (isMounted) {
+          setInsideCount(activeData.uniqueStudentCount)
+        }
+      } catch (err: unknown) {
+        console.error('[StudentsPage] Failed to refresh active sessions count:', err)
+      }
+    }
+
+    const handleSessionChange = () => {
+      void refreshActiveInside()
+    }
+
+    const handleVisibilityOrFocus = () => {
+      if (document.visibilityState === 'visible') {
+        void refreshActiveInside()
+      }
+    }
+
+    window.addEventListener('visibilitychange', handleVisibilityOrFocus)
+    window.addEventListener('focus', handleVisibilityOrFocus)
+    window.addEventListener('libsync:session-change', handleSessionChange)
+
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        void refreshActiveInside()
+      }
+    }, 10000)
 
     return () => {
       isMounted = false
+      window.removeEventListener('visibilitychange', handleVisibilityOrFocus)
+      window.removeEventListener('focus', handleVisibilityOrFocus)
+      window.removeEventListener('libsync:session-change', handleSessionChange)
+      clearInterval(interval)
     }
   }, [])
 
@@ -145,7 +190,6 @@ export function StudentsPage() {
     return matchesSearch && matchesDepartment && matchesYear && matchesStatus
   })
 
-  const insideCount = students.filter((student) => student.status === 'inside').length
   const activeCount = students.filter((student) => student.status === 'active').length
   const inactiveCount = students.filter((student) => student.status === 'inactive').length
   const isFiltered = Boolean(searchQuery || department !== 'All Departments' || year !== 'All Years' || status !== 'All Statuses')

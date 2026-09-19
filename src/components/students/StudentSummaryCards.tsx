@@ -26,7 +26,7 @@ export function StudentSummaryCards({
           value: 'All Registered',
           isNeutral: true,
         }}
-        description="Campus library database [Mock]"
+        description="Campus library database"
       />
 
       {/* 2. Active Students */}
@@ -39,7 +39,7 @@ export function StudentSummaryCards({
           value: '88.9% eligible',
           isPositive: true,
         }}
-        description="Valid RFID & digital passes [Mock]"
+        description="Valid RFID & digital passes"
       />
 
       {/* 3. Currently Inside */}
@@ -52,7 +52,7 @@ export function StudentSummaryCards({
           value: 'Live Occupancy',
           isPositive: true,
         }}
-        description="Seated across 3 study zones [Mock]"
+        description="Students with active sessions"
       />
 
       {/* 4. Inactive Students */}
@@ -65,7 +65,7 @@ export function StudentSummaryCards({
           value: 'Requires renewal',
           isNeutral: true,
         }}
-        description="Deactivated or expired passes [Mock]"
+        description="Deactivated or expired passes"
       />
     </div>
   )
