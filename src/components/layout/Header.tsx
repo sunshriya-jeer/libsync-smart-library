@@ -1,5 +1,6 @@
 import { Menu, Search, Bell, ShieldCheck, ChevronDown } from 'lucide-react'
 import { useState } from 'react'
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useCurrentRoute } from '../../hooks/useNavigation'
 import { useAuth } from '../../hooks/useAuth'
 import { Badge } from '../ui/Badge'
@@ -12,6 +13,11 @@ export function Header({ onOpenMobileMenu }: HeaderProps) {
   const { pageTitle } = useCurrentRoute()
   const { profile, session } = useAuth()
   const [notificationOpen, setNotificationOpen] = useState(false)
+
+  const [searchParams, setSearchParams] = useSearchParams()
+  const location = useLocation()
+  const navigate = useNavigate()
+  const headerQuery = searchParams.get('search') ?? searchParams.get('q') ?? ''
 
   const roleTitle = profile?.role === 'librarian'
     ? 'Librarian Desk'
@@ -59,15 +65,34 @@ export function Header({ onOpenMobileMenu }: HeaderProps) {
 
       {/* Right section: Search bar + Notification + Profile summary */}
       <div className="flex items-center gap-3">
-        {/* Quick Search Placeholder */}
+        {/* Quick Search */}
         <div className="relative hidden xl:block w-64">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
           <input
             type="text"
-            placeholder="Search student ID, seat..."
-            disabled
-            className="w-full bg-slate-50 hover:bg-slate-100/70 border border-slate-200 rounded-lg pl-9 pr-3 py-1.5 text-xs text-slate-700 placeholder:text-slate-400 focus:outline-hidden cursor-not-allowed transition-colors"
-            title="Search will be wired to student and seat records"
+            value={headerQuery}
+            onChange={(e) => {
+              const val = e.target.value
+              if (location.pathname !== '/students') {
+                navigate(val.trim() ? `/students?search=${encodeURIComponent(val)}` : '/students')
+              } else {
+                setSearchParams(
+                  (prev) => {
+                    const next = new URLSearchParams(prev)
+                    if (val.trim()) {
+                      next.set('search', val)
+                    } else {
+                      next.delete('search')
+                      next.delete('q')
+                    }
+                    return next
+                  },
+                  { replace: true }
+                )
+              }
+            }}
+            placeholder="Search students, seats..."
+            className="w-full bg-slate-50 hover:bg-slate-100/70 focus:bg-white border border-slate-200 rounded-lg pl-9 pr-3 py-1.5 text-xs text-slate-700 placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors"
           />
         </div>
 
@@ -90,8 +115,12 @@ export function Header({ onOpenMobileMenu }: HeaderProps) {
         )}
 
         {/* User Profile Summary */}
-        <div className="flex items-center gap-2.5 pl-2 border-l border-slate-200/80">
-          <div className="w-8 h-8 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-700 font-semibold text-xs shrink-0">
+        <Link
+          to={profile?.role === 'admin' ? '/settings' : '#'}
+          className="flex items-center gap-2.5 pl-2 border-l border-slate-200/80 cursor-pointer group hover:opacity-80 transition-opacity"
+          aria-label={profile?.role === 'admin' ? 'Open Administrator profile settings' : 'User profile summary'}
+        >
+          <div className="w-8 h-8 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-700 font-semibold text-xs shrink-0 group-hover:border-indigo-300">
             <ShieldCheck className="w-4 h-4 text-indigo-600" />
           </div>
 
@@ -105,7 +134,7 @@ export function Header({ onOpenMobileMenu }: HeaderProps) {
           </div>
 
           <ChevronDown className="w-3.5 h-3.5 text-slate-400 hidden sm:block" />
-        </div>
+        </Link>
       </div>
     </header>
   )

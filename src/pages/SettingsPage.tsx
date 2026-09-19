@@ -12,6 +12,7 @@ import { SettingsNavigation, type SettingsSection } from '../components/settings
 import { DEFAULT_SETTINGS, getSeatCounts, type MockSettings } from '../components/settings/mockSettings'
 import { useAuth } from '../hooks/useAuth'
 import { fetchSeats } from '../services/seatService'
+import { supabase } from '../services/supabase'
 
 export function SettingsPage() {
   const { session, profile } = useAuth()
@@ -27,13 +28,23 @@ export function SettingsPage() {
   const [showReset, setShowReset] = useState(false)
   const [showProfile, setShowProfile] = useState(false)
 
-  const currentAdmin: MockSettings['admin'] = adminProfileOverride ?? {
-    name: profile?.full_name || 'Administrator',
-    email: session?.user?.email || 'admin@libsync.edu',
-    role: profile?.role
-      ? (profile.role.charAt(0).toUpperCase() + profile.role.slice(1))
-      : 'Administrator',
-    library: 'LibSync Central Library',
+  const realEmail = session?.user?.email || ''
+  const realRole = profile?.role
+    ? (profile.role === 'librarian' ? 'Librarian' : 'Administrator')
+    : (session?.user?.user_metadata?.role
+        ? (session.user.user_metadata.role.charAt(0).toUpperCase() + session.user.user_metadata.role.slice(1))
+        : 'Administrator')
+  const realName =
+    profile?.full_name?.trim() ||
+    (session?.user?.user_metadata?.full_name as string)?.trim() ||
+    (session?.user?.user_metadata?.name as string)?.trim() ||
+    (realEmail ? realEmail.split('@')[0] : 'Administrator')
+
+  const currentAdmin: MockSettings['admin'] = {
+    name: adminProfileOverride?.name || realName,
+    email: adminProfileOverride?.email || realEmail,
+    role: adminProfileOverride?.role || realRole,
+    library: adminProfileOverride?.library || 'LibSync Central Library',
   }
 
   useEffect(() => {
@@ -83,10 +94,25 @@ export function SettingsPage() {
     setShowReset(false)
   }
 
-  const saveProfile = (updatedProfile: MockSettings['admin']) => {
+  const saveProfile = async (updatedProfile: MockSettings['admin']) => {
     setAdminProfileOverride(updatedProfile)
     setShowProfile(false)
     setSuccessMessage('Administrator profile updated.')
+
+    if (session?.user?.id && updatedProfile.name.trim()) {
+      try {
+        await supabase
+          .from('profiles')
+          .update({ full_name: updatedProfile.name.trim() })
+          .eq('id', session.user.id)
+
+        await supabase.auth.updateUser({
+          data: { full_name: updatedProfile.name.trim() },
+        })
+      } catch (err) {
+        console.warn('[SettingsPage] Notice: Could not sync profile update to Supabase:', err)
+      }
+    }
   }
 
   return (
@@ -143,7 +169,14 @@ export function SettingsPage() {
           </div>
         </div>
       </div>
-      {showProfile && <EditProfileModal profile={currentAdmin} onClose={() => setShowProfile(false)} onSave={saveProfile} />}
+      {showProfile && (
+        <EditProfileModal
+          key={`${currentAdmin.email}-${currentAdmin.name}`}
+          profile={currentAdmin}
+          onClose={() => setShowProfile(false)}
+          onSave={saveProfile}
+        />
+      )}
       {showReset && <ResetConfirmation onCancel={() => setShowReset(false)} onConfirm={resetSettings} />}
     </div>
   )

@@ -10,7 +10,7 @@ export function AppLayout() {
   return (
     <div className="min-h-screen flex bg-slate-50 text-slate-900 font-sans">
       {/* Permanent Desktop Sidebar */}
-      <div className="hidden lg:flex lg:shrink-0 lg:fixed lg:inset-y-0 lg:z-30">
+      <div className="hidden lg:fixed lg:inset-y-0 lg:left-0 lg:w-64 lg:z-30 lg:flex lg:flex-col pointer-events-none [&>*]:pointer-events-auto">
         <Sidebar />
       </div>
 

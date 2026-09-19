@@ -54,7 +54,7 @@ export const DEFAULT_SETTINGS: MockSettings = {
   },
   admin: {
     name: 'Administrator',
-    email: 'admin@libsync.edu',
+    email: '',
     role: 'Administrator',
     library: 'LibSync Central Library',
   },

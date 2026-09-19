@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import {
   AlertCircle,
   Check,
@@ -34,7 +35,8 @@ export function StudentsPage() {
   const [students, setStudents] = useState<Student[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
-  const [searchQuery, setSearchQuery] = useState('')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const searchQuery = searchParams.get('search') ?? searchParams.get('q') ?? ''
   const [department, setDepartment] = useState('All Departments')
   const [year, setYear] = useState('All Years')
   const [status, setStatus] = useState('All Statuses')
@@ -96,22 +98,50 @@ export function StudentsPage() {
     }
   }, [])
 
+  const handleSearchChange = (val: string) => {
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev)
+        if (val.trim()) {
+          next.set('search', val)
+        } else {
+          next.delete('search')
+          next.delete('q')
+        }
+        return next
+      },
+      { replace: true }
+    )
+  }
+
   const normalizedQuery = searchQuery.trim().toLowerCase()
   const visibleStudents = students.filter((student) => {
+    const studentId = [student.student_id, student.studentId, student.id].filter(Boolean).join(' ')
+    const fullName = [student.fullName, student.full_name].filter(Boolean).join(' ')
+    const departmentVal = student.department || ''
+    const emailVal = student.email || ''
+    const collegeBarcode = student.college_barcode || ''
+
     const matchesSearch =
       !normalizedQuery ||
-      [
-        student.fullName,
-        student.full_name,
-        student.student_id,
-        student.id,
-        student.department,
-        student.email,
-        student.college_barcode,
-      ].some((value) => value && value.toLowerCase().includes(normalizedQuery))
-    const matchesDepartment = department === 'All Departments' || student.department === department
-    const matchesYear = year === 'All Years' || student.year === year
-    const matchesStatus = status === 'All Statuses' || student.status === status
+      studentId.toLowerCase().includes(normalizedQuery) ||
+      fullName.toLowerCase().includes(normalizedQuery) ||
+      departmentVal.toLowerCase().includes(normalizedQuery) ||
+      emailVal.toLowerCase().includes(normalizedQuery) ||
+      collegeBarcode.toLowerCase().includes(normalizedQuery)
+
+    const matchesDepartment =
+      department === 'All Departments' ||
+      (student.department && student.department.trim().toLowerCase() === department.trim().toLowerCase())
+    const matchesYear =
+      year === 'All Years' ||
+      student.year === year ||
+      String(student.year).trim().toLowerCase() === year.trim().toLowerCase()
+    const matchesStatus =
+      status === 'All Statuses' ||
+      student.status === status ||
+      student.status?.toLowerCase() === status.toLowerCase()
+
     return matchesSearch && matchesDepartment && matchesYear && matchesStatus
   })
 
@@ -121,7 +151,7 @@ export function StudentsPage() {
   const isFiltered = Boolean(searchQuery || department !== 'All Departments' || year !== 'All Years' || status !== 'All Statuses')
 
   const clearFilters = () => {
-    setSearchQuery('')
+    handleSearchChange('')
     setDepartment('All Departments')
     setYear('All Years')
     setStatus('All Statuses')
@@ -220,7 +250,7 @@ export function StudentsPage() {
 
       <StudentFilters
         searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
+        onSearchChange={handleSearchChange}
         department={department}
         onDepartmentChange={setDepartment}
         year={year}
@@ -243,7 +273,7 @@ export function StudentsPage() {
             <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
             <p className="text-sm font-medium">Fetching students from Supabase...</p>
           </div>
-        ) : (
+        ) : visibleStudents.length > 0 ? (
           <>
             <div className="hidden overflow-x-auto md:block">
               <table className="w-full border-collapse text-left">
@@ -284,9 +314,9 @@ export function StudentsPage() {
                 />
               ))}
             </div>
-
-            {visibleStudents.length === 0 && <EmptyState onClear={clearFilters} isFiltered={isFiltered} />}
           </>
+        ) : (
+          <EmptyState onClear={clearFilters} isFiltered={isFiltered} />
         )}
 
         <div className="flex items-center justify-between border-t border-slate-100 bg-slate-50/40 px-5 py-3 text-xs text-slate-500 sm:px-6">
