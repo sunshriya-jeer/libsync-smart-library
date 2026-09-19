@@ -75,12 +75,15 @@ export function mapRowToLibrarySession(
   return {
     id: row.id,
     studentId,
+    student_id: row.student_id,
     studentName,
     department,
     seatNumber,
     section,
     entryTime: row.entry_time,
+    entry_time: row.entry_time,
     exitTime: row.exit_time ?? undefined,
+    exit_time: row.exit_time,
     durationMinutes,
     status,
   }
@@ -442,6 +445,10 @@ export async function createLibraryEntrySession(
     updatedSeat as SeatRow
   )
 
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('libsync:session-change'))
+  }
+
   return {
     session: mappedSession,
     seat: mappedSeat,
@@ -524,6 +531,10 @@ export async function completeLibraryExitSession(
     (studentData as StudentRow) || null,
     updatedSeatRow as SeatRow
   )
+
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('libsync:session-change'))
+  }
 
   return {
     session: mappedSession,
@@ -763,5 +774,61 @@ export async function fetchStudentVisitInfo(studentId: string): Promise<StudentV
     activeSession: activeData?.session || null,
   }
 }
+
+export interface ActiveSessionInfo {
+  count: number
+  uniqueStudentCount: number
+  studentIds: string[]
+  sessions: {
+    id: string
+    studentId: string
+    seatId: string
+    entryTime: string
+  }[]
+}
+
+/**
+ * Fetches real active library sessions from public.library_sessions
+ * where student_id IS NOT NULL AND exit_time IS NULL.
+ * Returns the count of unique students currently inside.
+ */
+export async function fetchActiveSessions(): Promise<ActiveSessionInfo> {
+  const session = await getAuthenticatedSession()
+
+  const { data, error } = await supabase
+    .from('library_sessions')
+    .select('id, student_id, seat_id, entry_time, exit_time')
+    .setHeader('Authorization', `Bearer ${session.access_token}`)
+    .is('exit_time', null)
+    .not('student_id', 'is', null)
+
+  if (error) {
+    console.error('[sessionService] Failed to load active sessions:', error)
+    throw handleDatabaseError(error, 'Failed to load active library sessions.', 'table: library_sessions')
+  }
+
+  const rows = (data ?? []) as {
+    id: string
+    student_id: string
+    seat_id: string
+    entry_time: string
+    exit_time: string | null
+  }[]
+
+  const uniqueStudentIds = Array.from(new Set(rows.map((r) => r.student_id).filter(Boolean)))
+
+  return {
+    count: rows.length,
+    uniqueStudentCount: uniqueStudentIds.length,
+    studentIds: uniqueStudentIds,
+    sessions: rows.map((r) => ({
+      id: r.id,
+      studentId: r.student_id,
+      seatId: r.seat_id,
+      entryTime: r.entry_time,
+    })),
+  }
+}
+
 
 

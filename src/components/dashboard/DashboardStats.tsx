@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Users, Armchair, UserCheck, BookOpen } from 'lucide-react'
 import { StatCard } from '../ui/StatCard'
 import { fetchSeats } from '../../services/seatService'
-import { fetchLibrarySessions } from '../../services/sessionService'
+import { fetchLibrarySessions, fetchActiveSessions } from '../../services/sessionService'
 
 export interface DashboardStatsProps {
   studentsInside?: number
@@ -38,40 +38,64 @@ export function DashboardStats({
 
     let isMounted = true
 
-    Promise.allSettled([fetchSeats(), fetchLibrarySessions()]).then(([seatsRes, sessionsRes]) => {
-      if (!isMounted) return
+    const loadData = () => {
+      Promise.allSettled([fetchSeats(), fetchLibrarySessions(), fetchActiveSessions()]).then(
+        ([seatsRes, sessionsRes, activeRes]) => {
+          if (!isMounted) return
 
-      if (seatsRes.status === 'fulfilled') {
-        const seats = seatsRes.value
-        setInternalSeats({
-          total: seats.length,
-          free: seats.filter((s) => s.status === 'free').length,
-          occupied: seats.filter((s) => s.status === 'occupied').length,
-        })
-      }
+          if (seatsRes.status === 'fulfilled') {
+            const seats = seatsRes.value
+            setInternalSeats({
+              total: seats.length,
+              free: seats.filter((s) => s.status === 'free').length,
+              occupied: seats.filter((s) => s.status === 'occupied').length,
+            })
+          }
 
-      if (sessionsRes.status === 'fulfilled') {
-        const sessions = sessionsRes.value
-        const active = sessions.filter((s) => s.status === 'active' || !s.exitTime).length
-        const today = new Date()
-        const visits = sessions.filter((s) => {
-          if (!s.entryTime) return false
-          const d = new Date(s.entryTime)
-          return (
-            d.getFullYear() === today.getFullYear() &&
-            d.getMonth() === today.getMonth() &&
-            d.getDate() === today.getDate()
-          )
-        }).length
-        setInternalInside(active)
-        setInternalVisits(visits)
-      }
+          if (activeRes.status === 'fulfilled') {
+            setInternalInside(activeRes.value.uniqueStudentCount)
+          } else if (sessionsRes.status === 'fulfilled') {
+            const sessions = sessionsRes.value
+            const activeStudents = new Set(
+              sessions
+                .filter((s) => (s.student_id || s.studentId) && (!s.exitTime && !s.exit_time))
+                .map((s) => s.student_id || s.studentId)
+                .filter((id) => id && id !== '—')
+            )
+            setInternalInside(activeStudents.size)
+          }
 
-      setInternalLoading(false)
-    })
+          if (sessionsRes.status === 'fulfilled') {
+            const sessions = sessionsRes.value
+            const today = new Date()
+            const visits = sessions.filter((s) => {
+              const entry = s.entryTime || s.entry_time
+              if (!entry) return false
+              const d = new Date(entry)
+              return (
+                d.getFullYear() === today.getFullYear() &&
+                d.getMonth() === today.getMonth() &&
+                d.getDate() === today.getDate()
+              )
+            }).length
+            setInternalVisits(visits)
+          }
+
+          setInternalLoading(false)
+        }
+      )
+    }
+
+    loadData()
+
+    const handleSessionChange = () => {
+      loadData()
+    }
+    window.addEventListener('libsync:session-change', handleSessionChange)
 
     return () => {
       isMounted = false
+      window.removeEventListener('libsync:session-change', handleSessionChange)
     }
   }, [hasProps])
 
@@ -87,9 +111,9 @@ export function DashboardStats({
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
-      {/* 1. Active Sessions / Students Inside */}
+      {/* 1. Students Currently Inside */}
       <StatCard
-        title="Active Sessions"
+        title="Students Currently Inside"
         value={isLoading ? '—' : studentsInside}
         icon={<Users className="w-5 h-5 text-indigo-600" />}
         iconBgClass="bg-indigo-50"

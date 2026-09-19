@@ -22,6 +22,7 @@ import { fetchSeats } from '../services/seatService'
 import {
   fetchLibrarySessions,
   fetchRecentScans,
+  fetchActiveSessions,
   type RecentScanRecord,
 } from '../services/sessionService'
 import { cn } from '../utils/cn'
@@ -30,6 +31,7 @@ export function LibrarianDashboardPage() {
   const [seats, setSeats] = useState<LibrarySeat[]>([])
   const [sessions, setSessions] = useState<LibrarySession[]>([])
   const [recentScans, setRecentScans] = useState<RecentScanRecord[]>([])
+  const [activeInsideCount, setActiveInsideCount] = useState<number | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -39,15 +41,17 @@ export function LibrarianDashboardPage() {
       setIsRefreshing(true)
       setError(null)
 
-      const [seatsData, sessionsData, scansData] = await Promise.all([
+      const [seatsData, sessionsData, scansData, activeData] = await Promise.all([
         fetchSeats(),
         fetchLibrarySessions(),
         fetchRecentScans(10),
+        fetchActiveSessions(),
       ])
 
       setSeats(seatsData)
       setSessions(sessionsData)
       setRecentScans(scansData)
+      setActiveInsideCount(activeData.uniqueStudentCount)
     } catch (err: unknown) {
       console.error('[LibrarianDashboardPage] Failed to refresh data:', err)
       setError(
@@ -65,16 +69,18 @@ export function LibrarianDashboardPage() {
 
     const loadInitialData = async () => {
       try {
-        const [seatsData, sessionsData, scansData] = await Promise.all([
+        const [seatsData, sessionsData, scansData, activeData] = await Promise.all([
           fetchSeats(),
           fetchLibrarySessions(),
           fetchRecentScans(10),
+          fetchActiveSessions(),
         ])
 
         if (isMounted) {
           setSeats(seatsData)
           setSessions(sessionsData)
           setRecentScans(scansData)
+          setActiveInsideCount(activeData.uniqueStudentCount)
           setError(null)
         }
       } catch (err: unknown) {
@@ -95,18 +101,54 @@ export function LibrarianDashboardPage() {
 
     void loadInitialData()
 
+    // Automatically refresh on window focus and tab visibility change
+    const handleVisibilityOrFocus = () => {
+      if (document.visibilityState === 'visible') {
+        void refreshDashboardData()
+      }
+    }
+
+    // Automatically refresh when an entry or exit completes across the app
+    const handleSessionChange = () => {
+      void refreshDashboardData()
+    }
+
+    window.addEventListener('visibilitychange', handleVisibilityOrFocus)
+    window.addEventListener('focus', handleVisibilityOrFocus)
+    window.addEventListener('libsync:session-change', handleSessionChange)
+
+    // Periodic live sync every 10 seconds while dashboard tab is visible
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        void refreshDashboardData()
+      }
+    }, 10000)
+
     return () => {
       isMounted = false
+      window.removeEventListener('visibilitychange', handleVisibilityOrFocus)
+      window.removeEventListener('focus', handleVisibilityOrFocus)
+      window.removeEventListener('libsync:session-change', handleSessionChange)
+      clearInterval(interval)
     }
-  }, [])
+  }, [refreshDashboardData])
 
   // Real database metrics computation
   const totalSeats = seats.length
   const freeSeats = seats.filter((s) => s.status === 'free').length
   const occupiedSeats = seats.filter((s) => s.status === 'occupied').length
 
-  const activeSessions = sessions.filter((s) => s.status === 'active' || !s.exitTime)
-  const studentsInside = activeSessions.length
+  // Fallback: unique students with active sessions (exit_time is null)
+  const activeSessionsFromSessions = sessions.filter(
+    (s) => (s.student_id || s.studentId) && !s.exitTime && !s.exit_time
+  )
+  const uniqueStudentsFromSessions = new Set(
+    activeSessionsFromSessions
+      .map((s) => s.student_id || s.studentId)
+      .filter((id) => id && id !== '—')
+  ).size
+
+  const studentsInside = activeInsideCount ?? uniqueStudentsFromSessions
 
   const today = new Date()
   const todayVisits = sessions.filter((s) => {

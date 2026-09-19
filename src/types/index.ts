@@ -40,12 +40,15 @@ export type ReportPeriod = 'today' | 'sevenDays' | 'thirtyDays'
 export interface LibrarySession {
   id: string
   studentId: string
+  student_id?: string
   studentName: string
   department: string
   seatNumber: string
   section: 'A' | 'B' | 'C' | 'D'
   entryTime: string
+  entry_time?: string
   exitTime?: string
+  exit_time?: string | null
   durationMinutes?: number
   status: LibrarySessionStatus
 }
