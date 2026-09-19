@@ -33,14 +33,14 @@ export interface MockSettings {
   admin: AdminProfile
 }
 
-export const INITIAL_MOCK_SETTINGS: MockSettings = {
+export const DEFAULT_SETTINGS: MockSettings = {
   library: {
-    libraryName: 'Central Engineering Library',
-    libraryCode: 'CEL-01',
-    location: 'Main Academic Block',
-    contactEmail: 'library@example.edu',
+    libraryName: 'LibSync Central Library',
+    libraryCode: 'LIBSYNC-01',
+    location: 'Main Campus • Floors 1-3',
+    contactEmail: 'admin@libsync.edu',
     openingTime: '08:00',
-    closingTime: '21:00',
+    closingTime: '20:00',
     enabledSections: { A: true, B: true, C: true, D: true },
     defaultSection: 'A',
     seatNaming: 'compact',
@@ -53,12 +53,14 @@ export const INITIAL_MOCK_SETTINGS: MockSettings = {
     compactTableView: false,
   },
   admin: {
-    name: 'Library Administrator',
-    email: 'admin@example.edu',
-    role: 'Librarian / Admin',
-    library: 'Central Engineering Library',
+    name: 'Administrator',
+    email: 'admin@libsync.edu',
+    role: 'Administrator',
+    library: 'LibSync Central Library',
   },
 }
+
+export const INITIAL_MOCK_SETTINGS = DEFAULT_SETTINGS
 
 export function getSeatCounts(seats: LibrarySeat[]) {
   return {

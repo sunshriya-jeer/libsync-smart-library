@@ -4,7 +4,7 @@ import type { LibraryPreferences as Preferences } from './mockSettings'
 interface LibraryPreferencesProps { value: Preferences; onChange: (field: keyof Preferences, value: boolean) => void }
 
 const ITEMS = [
-  { key: 'autoRefreshDashboard' as const, label: 'Auto-refresh dashboard', description: 'Keep local dashboard views visually current.', icon: RefreshCw },
+  { key: 'autoRefreshDashboard' as const, label: 'Auto-refresh dashboard', description: 'Keep dashboard views visually current.', icon: RefreshCw },
   { key: 'showOccupancyWarnings' as const, label: 'Show occupancy warnings', description: 'Highlight high-occupancy states in the interface.', icon: BellRing },
   { key: 'confirmStudentExit' as const, label: 'Confirm student exit', description: 'Ask for confirmation before completing an active session.', icon: Check },
   { key: 'showSessionDuration' as const, label: 'Show session duration', description: 'Display elapsed time in session views.', icon: Clock3 },

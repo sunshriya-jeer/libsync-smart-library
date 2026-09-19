@@ -5,7 +5,7 @@ export type SettingsSection = 'library' | 'seats' | 'preferences' | 'administrat
 const NAV_ITEMS = [
   { id: 'library' as const, label: 'Library', description: 'Basic information', icon: Building2 },
   { id: 'seats' as const, label: 'Seat Configuration', description: 'Capacity and sections', icon: Armchair },
-  { id: 'preferences' as const, label: 'Preferences', description: 'Local display options', icon: SlidersHorizontal },
+  { id: 'preferences' as const, label: 'Preferences', description: 'Display and view options', icon: SlidersHorizontal },
   { id: 'administrator' as const, label: 'Administrator', description: 'Profile details', icon: UserRound },
 ]
 
