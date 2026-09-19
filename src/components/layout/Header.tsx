@@ -3,7 +3,6 @@ import { useState } from 'react'
 import { useCurrentRoute } from '../../hooks/useNavigation'
 import { useAuth } from '../../hooks/useAuth'
 import { Badge } from '../ui/Badge'
-import { INITIAL_MOCK_SEATS } from '../seats/mockSeats'
 
 interface HeaderProps {
   onOpenMobileMenu: () => void
@@ -13,8 +12,6 @@ export function Header({ onOpenMobileMenu }: HeaderProps) {
   const { pageTitle } = useCurrentRoute()
   const { profile, session } = useAuth()
   const [notificationOpen, setNotificationOpen] = useState(false)
-  const occupiedSeats = INITIAL_MOCK_SEATS.filter((seat) => seat.status === 'occupied').length
-  const occupancy = Math.round((occupiedSeats / INITIAL_MOCK_SEATS.length) * 100)
 
   const roleTitle = profile?.role === 'librarian'
     ? 'Librarian Desk'
@@ -52,11 +49,11 @@ export function Header({ onOpenMobileMenu }: HeaderProps) {
       {/* Middle/Status section */}
       <div className="hidden md:flex items-center gap-2">
         <Badge variant="success" dot size="sm">
-          Local Mock Active
+          System Online
         </Badge>
         <span className="text-xs text-slate-400">•</span>
         <Badge variant="default" size="sm">
-          Occupancy: {occupancy}%
+          Database Synced
         </Badge>
       </div>
 

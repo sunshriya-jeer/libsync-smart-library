@@ -45,6 +45,7 @@ export function mapRowToStudent(row: StudentRow): Student {
     qrToken: row.qr_token,
     qr_token: row.qr_token,
     college_barcode: row.college_barcode ?? null,
+    profile_id: row.profile_id ?? null,
     created_at: row.created_at,
     updated_at: row.updated_at,
     joinedDate: row.created_at
@@ -239,4 +240,78 @@ export async function updateStudentStatus(id: string, status: StudentStatus): Pr
   }
 
   return mapRowToStudent(data as StudentRow)
+}
+
+export interface LinkStudentResult {
+  success: boolean
+  student_id?: string
+  full_name?: string
+  code?: string
+  error?: string
+}
+
+/**
+ * Fetches the currently authenticated student's linked record from public.students
+ * using the Supabase Auth user ID (matching profile_id).
+ */
+export async function fetchCurrentStudent(): Promise<Student | null> {
+  const session = await getAuthenticatedSession()
+
+  const { data, error } = await supabase
+    .from('students')
+    .select('*')
+    .setHeader('Authorization', `Bearer ${session.access_token}`)
+    .eq('profile_id', session.user.id)
+    .maybeSingle()
+
+  if (error) {
+    throw handleDatabaseError(error, 'Failed to retrieve your student library record.')
+  }
+
+  if (!data) {
+    return null
+  }
+
+  return mapRowToStudent(data as StudentRow)
+}
+
+/**
+ * Invokes the secure database RPC link_student_account to link the authenticated
+ * user's profile to their pre-registered record in public.students.
+ */
+export async function linkStudentAccount(
+  studentId: string,
+  collegeBarcode: string,
+  fullName?: string
+): Promise<LinkStudentResult> {
+  await getAuthenticatedSession()
+
+  const { data, error } = await supabase.rpc('link_student_account', {
+    p_student_id: studentId.trim(),
+    p_college_barcode: collegeBarcode.trim(),
+    p_full_name: fullName?.trim() || null,
+  })
+
+  if (error) {
+    return {
+      success: false,
+      error: error.message || 'Unable to connect to the library database to link your account.',
+    }
+  }
+
+  const result = data as {
+    success: boolean
+    code?: string
+    error?: string
+    student_id?: string
+    full_name?: string
+  }
+
+  return {
+    success: Boolean(result?.success),
+    student_id: result?.student_id,
+    full_name: result?.full_name,
+    code: result?.code,
+    error: result?.error,
+  }
 }

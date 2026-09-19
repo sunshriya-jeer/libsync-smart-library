@@ -1,23 +1,44 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { QrCode, CheckCircle2, ShieldCheck, RefreshCw, Smartphone } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
+import { fetchCurrentStudent } from '../services/studentService'
+import type { Student } from '../types'
 import { Card, CardContent, CardHeader } from '../components/ui/Card'
 import { Badge } from '../components/ui/Badge'
 import { Button } from '../components/ui/Button'
 
 export function StudentScanPage() {
   const { profile, session } = useAuth()
+  const [student, setStudent] = useState<Student | null>(null)
   const [scannedMessage, setScannedMessage] = useState<string | null>(null)
   const [isScanning, setIsScanning] = useState(false)
 
-  const studentName = profile?.full_name || session?.user.email?.split('@')[0] || 'Student'
+  useEffect(() => {
+    let isMounted = true
+    fetchCurrentStudent()
+      .then((data) => {
+        if (!isMounted || !data) return
+        setStudent(data)
+      })
+      .catch((err) => {
+        console.warn('[StudentScanPage] Could not load linked student record:', err)
+      })
+    return () => {
+      isMounted = false
+    }
+  }, [])
+
+  const studentName = student?.fullName || student?.full_name || profile?.full_name || session?.user.email?.split('@')[0] || 'Student'
+  const qrTokenDisplay = student?.qr_token || 'LIB-PASS-SYNC'
+  const studentIdDisplay = student?.student_id || 'STU-2026'
+  const collegeBarcodeDisplay = student?.college_barcode || 'Physical Card Barcode'
 
   const handleSimulateScan = () => {
     setIsScanning(true)
     setScannedMessage(null)
     setTimeout(() => {
       setIsScanning(false)
-      setScannedMessage('Pass verified by Entrance Kiosk 01. Seat B-04 allocated.')
+      setScannedMessage(`Pass verified for ${studentName} (${studentIdDisplay}). Kiosk entry logged.`)
     }, 900)
   }
 
@@ -53,17 +74,24 @@ export function StudentScanPage() {
             <div className="w-48 h-48 sm:w-56 sm:h-56 bg-slate-900 rounded-2xl flex flex-col items-center justify-center p-4 text-white">
               <QrCode className="w-full h-full text-white" />
             </div>
-            <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 bg-white px-3 py-0.5 rounded-full border border-indigo-100 text-[10px] font-semibold text-indigo-600 shadow-2xs">
-              TOKEN #STU-9921
+            <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 bg-white px-3 py-0.5 rounded-full border border-indigo-100 text-[10px] font-mono font-semibold text-indigo-600 shadow-2xs max-w-[220px] truncate">
+              TOKEN #{qrTokenDisplay}
             </div>
           </div>
 
           <div className="space-y-1">
             <h2 className="text-xl font-bold text-slate-900">{studentName}</h2>
-            <p className="text-xs text-slate-500">ID: STU-2026-0819 • Valid 2025-2026</p>
+            <p className="text-xs text-slate-500 font-mono">
+              ID: {studentIdDisplay} • Barcode: {collegeBarcodeDisplay}
+            </p>
+            {student?.department && (
+              <p className="text-xs text-slate-400">
+                {student.department} {student.year ? `• ${student.year}` : ''}
+              </p>
+            )}
             <div className="pt-2 flex justify-center gap-2">
-              <Badge variant="success" dot size="sm">
-                Active Library Member
+              <Badge variant={student?.status === 'inactive' ? 'default' : 'success'} dot size="sm">
+                {student?.status === 'inactive' ? 'Inactive Member' : 'Active Library Member'}
               </Badge>
             </div>
           </div>

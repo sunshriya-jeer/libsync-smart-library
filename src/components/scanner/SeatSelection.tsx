@@ -25,7 +25,9 @@ export function SeatSelection({
   onConfirm,
 }: SeatSelectionProps) {
   const availableSeats = seats.filter(
-    (seat) => seat.status === 'free' && (section === 'all' || seat.section === section)
+    (seat) =>
+      (seat.status === 'free' || seat.id === selectedSeat?.id) &&
+      (section === 'all' || seat.section === section)
   )
 
   return (

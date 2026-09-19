@@ -10,6 +10,6 @@
 
 export const SERVICE_STATUS = {
   version: '1.0.0-alpha',
-  dataSource: 'local-mock',
-  supabaseConfigured: false,
+  dataSource: 'supabase',
+  supabaseConfigured: true,
 } as const

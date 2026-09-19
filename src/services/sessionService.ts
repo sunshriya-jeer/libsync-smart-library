@@ -322,7 +322,8 @@ export async function getActiveSessionForStudent(
  */
 export async function createLibraryEntrySession(
   studentId: string,
-  seatId: string
+  seatId: string,
+  reservationId?: string
 ): Promise<{ session: LibrarySession; seat: LibrarySeat }> {
   const session = await getAuthenticatedSession()
 
@@ -343,7 +344,7 @@ export async function createLibraryEntrySession(
     throw new Error('This student already has an active library session and is currently inside.')
   }
 
-  // Concurrency & Safety check 2: Selected seat is still free in the database
+  // Concurrency & Safety check 2: Selected seat is free (or reserved for this student)
   const { data: seatCheck, error: seatCheckError } = await supabase
     .from('seats')
     .select('*')
@@ -355,7 +356,11 @@ export async function createLibraryEntrySession(
     throw handleDatabaseError(seatCheckError || {}, 'Failed to verify seat status before entry creation.')
   }
 
-  if (seatCheck.status !== 'free') {
+  const isSeatValid = reservationId
+    ? seatCheck.status === 'free' || seatCheck.status === 'reserved'
+    : seatCheck.status === 'free'
+
+  if (!isSeatValid) {
     throw new Error(
       `Seat ${seatCheck.seat_number} is no longer available (status: ${seatCheck.status}). Please select another seat.`
     )
@@ -402,6 +407,22 @@ export async function createLibraryEntrySession(
       .eq('id', insertedSession.id)
 
     throw handleDatabaseError(seatUpdateError || {}, 'Failed to update seat status to occupied.')
+  }
+
+  // Step 3: Fulfill reservation if entry was from an active reservation
+  if (reservationId) {
+    try {
+      await supabase
+        .from('library_reservations')
+        .update({
+          status: 'fulfilled',
+          fulfilled_at: now,
+        })
+        .setHeader('Authorization', `Bearer ${session.access_token}`)
+        .eq('id', reservationId)
+    } catch (resFulfillErr) {
+      console.warn('[sessionService] Failed to mark reservation fulfilled:', resFulfillErr)
+    }
   }
 
   // Enrich with student details
@@ -647,3 +668,67 @@ export async function fetchRecentScans(limit = 10): Promise<RecentScanRecord[]> 
 
   return mappedRecords.slice(0, limit)
 }
+
+/**
+ * Fetches library sessions for a specific student from public.library_sessions,
+ * enriched with associated seat information from public.seats.
+ * Ordered by entry_time descending.
+ */
+export async function fetchStudentSessions(
+  studentId: string,
+  limit?: number
+): Promise<LibrarySession[]> {
+  const session = await getAuthenticatedSession()
+
+  let query = supabase
+    .from('library_sessions')
+    .select('*')
+    .setHeader('Authorization', `Bearer ${session.access_token}`)
+    .eq('student_id', studentId)
+    .order('entry_time', { ascending: false })
+
+  if (typeof limit === 'number' && limit > 0) {
+    query = query.limit(limit)
+  }
+
+  const { data: sessionRows, error: sessionsError } = await query
+
+  if (sessionsError) {
+    console.error('[sessionService] Failed to load student sessions:', sessionsError)
+    throw handleDatabaseError(
+      sessionsError,
+      'Failed to load student library sessions from the database.',
+      'table: library_sessions'
+    )
+  }
+
+  const rows = (sessionRows ?? []) as LibrarySessionRow[]
+  if (rows.length === 0) {
+    return []
+  }
+
+  const seatIds = Array.from(new Set(rows.map((r) => r.seat_id).filter(Boolean)))
+  const seatMap = new Map<string, SeatRow>()
+
+  if (seatIds.length > 0) {
+    const { data: seatsData, error: seatsError } = await supabase
+      .from('seats')
+      .select('*')
+      .in('id', seatIds)
+      .setHeader('Authorization', `Bearer ${session.access_token}`)
+
+    if (seatsError) {
+      console.error('[sessionService] Failed to load seats for student sessions:', seatsError)
+    } else if (seatsData) {
+      for (const seat of seatsData as SeatRow[]) {
+        seatMap.set(seat.id, seat)
+      }
+    }
+  }
+
+  return rows.map((row) => {
+    const seat = seatMap.get(row.seat_id) || row.seats || null
+    return mapRowToLibrarySession(row, null, seat)
+  })
+}
+

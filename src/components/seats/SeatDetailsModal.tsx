@@ -14,6 +14,7 @@ interface SeatDetailsModalProps {
 const STATUS_COPY: Record<LibrarySeatStatus, { label: string; className: string; icon: typeof Armchair }> = {
   free: { label: 'Available', className: 'bg-emerald-50 text-emerald-700 border-emerald-200', icon: CheckCircle2 },
   occupied: { label: 'Occupied', className: 'bg-indigo-50 text-indigo-700 border-indigo-200', icon: UserRound },
+  reserved: { label: 'Reserved', className: 'bg-amber-50 text-amber-700 border-amber-200', icon: Armchair },
   maintenance: { label: 'Maintenance', className: 'bg-rose-50 text-rose-700 border-rose-200', icon: Construction },
 }
 
@@ -34,13 +35,14 @@ export function SeatDetailsModal({ seat, onClose, onAction }: SeatDetailsModalPr
           <div className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold ${status.className}`}><StatusIcon className="h-4 w-4" />Status: {status.label}</div>
           {seat.status === 'occupied' && <div className="grid grid-cols-2 gap-4 border-t border-slate-100 pt-4"><Detail label="Student" value={seat.studentName ?? 'Assigned student'} /><Detail label="Student ID" value={seat.studentId ?? 'Mock assignment'} /><Detail label="Entry time" value={formatEntryTime(seat.entryTime)} icon={<Clock3 className="h-3.5 w-3.5" />} /><Detail label="Duration" value={formatDuration(seat.entryTime)} icon={<Clock3 className="h-3.5 w-3.5" />} /></div>}
           {seat.status === 'free' && <p className="text-sm leading-relaxed text-slate-500">This seat is available for a new library session.</p>}
+          {seat.status === 'reserved' && <p className="text-sm leading-relaxed text-slate-500">This seat is currently held under a 30-minute student reservation.</p>}
           {seat.status === 'maintenance' && <p className="text-sm leading-relaxed text-slate-500">This seat is temporarily unavailable for library use.</p>}
         </CardContent></Card>
         <div className="flex flex-wrap justify-end gap-2 border-t border-slate-100 p-5 sm:p-6">
           <Button type="button" variant="outline" size="sm" onClick={onClose}>Close</Button>
           {seat.status === 'free' && <><Button type="button" variant="primary" size="sm" icon={<UserRound className="h-3.5 w-3.5" />} onClick={() => onAction('occupy')}>Mark occupied</Button><Button type="button" variant="danger" size="sm" icon={<Construction className="h-3.5 w-3.5" />} onClick={() => onAction('maintenance')}>Maintenance</Button></>}
           {seat.status === 'occupied' && <><Button type="button" variant="outline" size="sm" icon={<Armchair className="h-3.5 w-3.5" />} onClick={() => onAction('release')}>Release seat</Button><Button type="button" variant="danger" size="sm" icon={<Construction className="h-3.5 w-3.5" />} onClick={() => onAction('maintenance')}>Maintenance</Button></>}
-          {seat.status === 'maintenance' && <Button type="button" variant="primary" size="sm" icon={<CheckCircle2 className="h-3.5 w-3.5" />} onClick={() => onAction('free')}>Mark available</Button>}
+          {(seat.status === 'maintenance' || seat.status === 'reserved') && <Button type="button" variant="primary" size="sm" icon={<CheckCircle2 className="h-3.5 w-3.5" />} onClick={() => onAction('free')}>Mark available</Button>}
         </div>
       </div>
     </div>

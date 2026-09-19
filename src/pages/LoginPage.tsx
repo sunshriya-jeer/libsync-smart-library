@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { Navigate, useLocation, useNavigate } from 'react-router-dom'
+import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { BookOpenCheck, LoaderCircle, LockKeyhole, Mail } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
 import { Button } from '../components/ui/Button'
@@ -136,6 +136,15 @@ export function LoginPage() {
             <button type="button" className="w-full text-center text-sm font-medium text-indigo-600 hover:text-indigo-700" onClick={toggleForgotPassword}>
               {isForgotPassword ? 'Return to sign in' : 'Forgot password?'}
             </button>
+
+            {!isForgotPassword && (
+              <div className="pt-2 text-center text-xs text-slate-500 border-t border-slate-100">
+                New student?{' '}
+                <Link to="/register" className="font-semibold text-indigo-600 hover:text-indigo-700">
+                  Create your library account
+                </Link>
+              </div>
+            )}
           </form>
         </section>
       </div>

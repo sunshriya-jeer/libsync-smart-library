@@ -17,6 +17,14 @@ export interface AuthProfile {
   full_name?: string | null
 }
 
+export interface SignUpStudentParams {
+  email: string
+  password: string
+  fullName: string
+  studentId: string
+  collegeBarcode: string
+}
+
 interface AuthContextValue {
   session: Session | null
   profile: AuthProfile | null
@@ -24,6 +32,7 @@ interface AuthContextValue {
   error: string | null
   isPasswordRecovery: boolean
   signInWithPassword: (email: string, password: string) => Promise<string | null>
+  signUpStudent: (params: SignUpStudentParams) => Promise<string | null>
   resetPasswordForEmail: (email: string) => Promise<string | null>
   updatePassword: (password: string) => Promise<string | null>
   signOut: () => Promise<string | null>
@@ -33,7 +42,10 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined)
 
-async function getProfile(userId: string, accessToken?: string): Promise<AuthProfile> {
+const inFlightProfileLinking = new Map<string, Promise<AuthProfile>>()
+
+async function fetchExistingProfile(userId: string, accessToken?: string): Promise<AuthProfile | null> {
+  // 1. Check public.profiles (Admin, Librarian, or pre-existing Student profile)
   let query = supabase
     .from('profiles')
     .select('role, full_name')
@@ -46,27 +58,157 @@ async function getProfile(userId: string, accessToken?: string): Promise<AuthPro
   const { data, error } = await query.maybeSingle()
 
   if (error) {
-    console.error('[useAuth] Profile query failed:', {
+    console.warn('[useAuth] Profile query notice (checking students fallback):', {
       code: error.code,
       message: error.message,
-      hint: error.hint,
-      details: error.details,
     })
-    throw new Error('Unable to load your profile.')
   }
 
-  if (!data) {
-    console.warn('[useAuth] No profile record found for user id:', userId)
-    throw new Error('No library profile was found for this account.')
+  if (data && (data.role === 'admin' || data.role === 'librarian' || data.role === 'student')) {
+    return {
+      role: data.role,
+      full_name: data.full_name ?? null,
+    }
   }
 
-  if (data.role !== 'admin' && data.role !== 'librarian' && data.role !== 'student') {
-    throw new Error('Your account has an unsupported library role.')
+  // 2. Direct student lookup: check public.students where profile_id matches the authenticated user ID
+  let studentQuery = supabase
+    .from('students')
+    .select('id, student_id, full_name, profile_id')
+    .eq('profile_id', userId)
+
+  if (accessToken) {
+    studentQuery = studentQuery.setHeader('Authorization', `Bearer ${accessToken}`)
   }
 
-  return {
-    role: data.role,
-    full_name: data.full_name ?? null,
+  const { data: studentData, error: studentError } = await studentQuery.maybeSingle()
+
+  if (studentError) {
+    console.warn('[useAuth] Student profile_id lookup notice:', {
+      code: studentError.code,
+      message: studentError.message,
+    })
+  }
+
+  if (studentData) {
+    // Synchronize public.profiles if missing
+    void supabase.from('profiles').upsert({
+      id: userId,
+      role: 'student',
+      full_name: studentData.full_name ?? null,
+    })
+
+    return {
+      role: 'student',
+      full_name: studentData.full_name ?? null,
+    }
+  }
+
+  return null
+}
+
+async function ensureProfileAndLink(session: Session): Promise<AuthProfile> {
+  const userId = session.user.id
+  const inFlight = inFlightProfileLinking.get(userId)
+  if (inFlight) {
+    return inFlight
+  }
+
+  const linkingPromise = (async (): Promise<AuthProfile> => {
+    // 1. Check if profile already exists (Admin, Librarian, or already-linked Student)
+    const existingProfile = await fetchExistingProfile(userId, session.access_token)
+    if (existingProfile) {
+      return existingProfile
+    }
+
+    // 2. Profile does not exist yet. Check if this authenticated user is a student awaiting account linking
+    const metadata = (session.user.user_metadata || {}) as Record<string, unknown>
+    const isStudent =
+      metadata.role === 'student' ||
+      typeof metadata.student_id === 'string' ||
+      typeof metadata.college_barcode === 'string'
+
+    if (!isStudent) {
+      console.warn('[useAuth] No library profile record found for user id:', userId)
+      throw new Error('No library profile was found for this account.')
+    }
+
+    // 3. Verify student registration metadata is present
+    const studentId = typeof metadata.student_id === 'string' ? metadata.student_id.trim() : ''
+    const collegeBarcode = typeof metadata.college_barcode === 'string' ? metadata.college_barcode.trim() : ''
+    const fullName = typeof metadata.full_name === 'string' ? metadata.full_name.trim() : ''
+
+    if (!studentId || !collegeBarcode) {
+      throw new Error(
+        'Student registration details (Student ID or College Barcode) are missing from your account. Please contact the library circulation desk.'
+      )
+    }
+
+    // 4. Call the existing public.link_student_account RPC using the authenticated session
+    const { data: linkData, error: linkError } = await supabase.rpc('link_student_account', {
+      p_student_id: studentId,
+      p_college_barcode: collegeBarcode,
+      p_full_name: fullName || null,
+    })
+
+    if (linkError) {
+      console.error('[useAuth] link_student_account RPC error:', linkError)
+      throw new Error(linkError.message || 'Unable to connect to the library database to link your student record.')
+    }
+
+    const result = linkData as {
+      success?: boolean
+      code?: string
+      error?: string
+      student_id?: string
+      full_name?: string
+    } | null
+
+    if (!result?.success) {
+      // If the account was already linked by a concurrent request, check again before failing
+      if (result?.code === 'ACCOUNT_ALREADY_LINKED') {
+        const linkedProfile = await fetchExistingProfile(userId, session.access_token)
+        if (linkedProfile) {
+          return linkedProfile
+        }
+      }
+
+      const code = result?.code
+      let errorMessage = result?.error || 'Failed to verify and link your student library record.'
+
+      if (code === 'STUDENT_NOT_FOUND') {
+        errorMessage = result?.error || `No library record found matching Student ID "${studentId}". Please verify with the library desk.`
+      } else if (code === 'BARCODE_MISMATCH') {
+        errorMessage = result?.error || 'The college barcode provided does not match the library record on file for this Student ID.'
+      } else if (code === 'STUDENT_INACTIVE') {
+        errorMessage = result?.error || 'This student record is currently marked inactive. Please visit the library circulation desk.'
+      } else if (code === 'STUDENT_ALREADY_LINKED') {
+        errorMessage = result?.error || 'This student record is already linked to an existing account.'
+      } else if (code === 'ACCOUNT_ALREADY_LINKED') {
+        errorMessage = result?.error || 'This account is already linked to another student record.'
+      }
+
+      throw new Error(errorMessage)
+    }
+
+    // 5. Successfully linked! Retrieve the newly inserted profile row
+    const createdProfile = await fetchExistingProfile(userId, session.access_token)
+    if (createdProfile) {
+      return createdProfile
+    }
+
+    return {
+      role: 'student',
+      full_name: result.full_name || fullName || null,
+    }
+  })()
+
+  inFlightProfileLinking.set(userId, linkingPromise)
+
+  try {
+    return await linkingPromise
+  } finally {
+    inFlightProfileLinking.delete(userId)
   }
 }
 
@@ -113,8 +255,8 @@ function getAuthErrorMessage(error: { code?: string; status?: number; message?: 
 function getMockSession(): { session: Session; profile: AuthProfile } | null {
   if (typeof window === 'undefined') return null
   const mockRole = (localStorage.getItem('libsync_mock_role') || sessionStorage.getItem('libsync_mock_role')) as AuthRole | null
-  if (!mockRole) return null
-  const mockName = localStorage.getItem('libsync_mock_name') || sessionStorage.getItem('libsync_mock_name') || (mockRole === 'student' ? 'Demo Student' : mockRole === 'librarian' ? 'Demo Librarian' : 'Demo Administrator')
+  if (!mockRole || mockRole === 'student') return null
+  const mockName = localStorage.getItem('libsync_mock_name') || sessionStorage.getItem('libsync_mock_name') || (mockRole === 'librarian' ? 'Demo Librarian' : 'Demo Administrator')
   return {
     session: {
       access_token: 'mock-token',
@@ -165,7 +307,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     try {
-      const currentProfile = await getProfile(currentSession.user.id, currentSession.access_token)
+      const currentProfile = await ensureProfileAndLink(currentSession)
       setProfile(currentProfile)
       return currentProfile
     } catch (profileError) {
@@ -299,18 +441,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (signInError || !data.session) {
       if (email.endsWith('@libsync.demo')) {
-        const demoRole: AuthRole = email.startsWith('student') ? 'student' : email.startsWith('librarian') ? 'librarian' : 'admin'
-        const demoName = demoRole === 'student' ? 'Demo Student' : demoRole === 'librarian' ? 'Demo Librarian' : 'Demo Administrator'
+        if (email.startsWith('student')) {
+          const message = 'Demo student sign-in is disabled. Please sign in with your registered student account or create one.'
+          setError(message)
+          return message
+        }
+        const demoRole: AuthRole = email.startsWith('librarian') ? 'librarian' : 'admin'
+        const demoName = demoRole === 'librarian' ? 'Demo Librarian' : 'Demo Administrator'
         if (typeof window !== 'undefined') {
           localStorage.setItem('libsync_mock_role', demoRole)
           localStorage.setItem('libsync_mock_name', demoName)
           sessionStorage.setItem('libsync_mock_role', demoRole)
           sessionStorage.setItem('libsync_mock_name', demoName)
         }
-        const mock = getMockSession()!
-        setSession(mock.session)
-        setProfile(mock.profile)
-        return null
+        const mock = getMockSession()
+        if (mock) {
+          setSession(mock.session)
+          setProfile(mock.profile)
+          return null
+        }
       }
 
       const message = getSignInErrorMessage(signInError)
@@ -319,7 +468,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     try {
-      const currentProfile = await getProfile(data.session.user.id, data.session.access_token)
+      const currentProfile = await ensureProfileAndLink(data.session)
       setSession(data.session)
       setProfile(currentProfile)
       return null
@@ -329,6 +478,76 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await supabase.auth.signOut()
       return message
     }
+  }
+
+  const signUpStudent = async (params: SignUpStudentParams) => {
+    setError(null)
+    const trimmedEmail = params.email.trim()
+    const trimmedPassword = params.password
+    const trimmedName = params.fullName.trim()
+    const trimmedStudentId = params.studentId.trim()
+    const trimmedBarcode = params.collegeBarcode.trim()
+
+    if (!trimmedEmail || !trimmedPassword || !trimmedName || !trimmedStudentId || !trimmedBarcode) {
+      const message = 'Please fill in all required registration fields.'
+      setError(message)
+      return message
+    }
+
+    if (trimmedPassword.length < 6) {
+      const message = 'Password must be at least 6 characters long.'
+      setError(message)
+      return message
+    }
+
+    const { data: authData, error: authError } = await supabase.auth.signUp({
+      email: trimmedEmail,
+      password: trimmedPassword,
+      options: {
+        data: {
+          full_name: trimmedName,
+          role: 'student',
+          student_id: trimmedStudentId,
+          college_barcode: trimmedBarcode,
+        },
+      },
+    })
+
+    if (authError) {
+      let msg = authError.message
+      if (
+        authError.message.toLowerCase().includes('already registered') ||
+        authError.message.toLowerCase().includes('user already exists')
+      ) {
+        msg = 'An account with this email address already exists. Please sign in instead.'
+      }
+      setError(msg)
+      return msg
+    }
+
+    if (!authData.user) {
+      const message = 'Failed to create student account. Please try again.'
+      setError(message)
+      return message
+    }
+
+    if (authData.session) {
+      try {
+        const currentProfile = await ensureProfileAndLink(authData.session)
+        setSession(authData.session)
+        setProfile(currentProfile)
+        return null
+      } catch (linkError) {
+        await supabase.auth.signOut()
+        setSession(null)
+        setProfile(null)
+        const message = linkError instanceof Error ? linkError.message : 'Failed to verify and link your student library record.'
+        setError(message)
+        return message
+      }
+    }
+
+    return 'Registration link sent. Please check your email to confirm your account.'
   }
 
   const resetPasswordForEmail = async (email: string) => {
@@ -391,6 +610,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         error,
         isPasswordRecovery,
         signInWithPassword,
+        signUpStudent,
         resetPasswordForEmail,
         updatePassword,
         signOut,

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-import { AlertCircle, Database } from 'lucide-react'
-import type { LibrarySeat, ScanAction, Student } from '../types'
+import { AlertCircle, Database, Sparkles } from 'lucide-react'
+import type { LibrarySeat, ScanAction, Student, LibraryReservation } from '../types'
 import { Badge } from '../components/ui/Badge'
 import { ActiveSessionCard } from '../components/scanner/ActiveSessionCard'
 import { RecentScans } from '../components/scanner/RecentScans'
@@ -18,6 +18,7 @@ import {
 } from '../services/sessionService'
 import { fetchFreeSeats } from '../services/seatService'
 import { fetchStudents } from '../services/studentService'
+import { fetchActiveStudentReservation } from '../services/reservationService'
 
 type ScannerPhase = 'ready' | 'scanning' | 'verified' | 'success' | 'error'
 
@@ -52,6 +53,7 @@ export function ScannerPage() {
   const [errorMessage, setErrorMessage] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isLoadingSeats, setIsLoadingSeats] = useState(false)
+  const [activeReservation, setActiveReservation] = useState<LibraryReservation | null>(null)
   const [successDetails, setSuccessDetails] = useState<SuccessDetails | null>(null)
 
   const loadRecentScans = async () => {
@@ -132,6 +134,7 @@ export function ScannerPage() {
     setPhase('ready')
     setScannedStudent(null)
     setActiveSession(null)
+    setActiveReservation(null)
     setSelectedSeat(null)
     setErrorMessage('')
     setSuccessDetails(null)
@@ -153,6 +156,7 @@ export function ScannerPage() {
     setPhase('scanning')
     setScannedStudent(null)
     setActiveSession(null)
+    setActiveReservation(null)
     setSelectedSeat(null)
     setSuccessDetails(null)
     setErrorMessage('')
@@ -215,9 +219,27 @@ export function ScannerPage() {
         return
       }
 
+      // Step 4: Check if student has an active seat reservation
+      const studentReservation = await fetchActiveStudentReservation(student.id)
+      setActiveReservation(studentReservation)
+
       // Load currently free seats from public.seats
       const seats = await refreshFreeSeats()
-      if (seats.length === 0) {
+
+      if (studentReservation) {
+        // Auto-select the reserved seat for instant entry
+        const reservedSeatObj: LibrarySeat = {
+          id: studentReservation.seatId,
+          seatNumber: studentReservation.seatNumber || '—',
+          section: (studentReservation.section || 'A') as 'A' | 'B' | 'C' | 'D',
+          status: 'reserved',
+        }
+        setSelectedSeat(reservedSeatObj)
+        setFreeSeats((prev) => {
+          if (prev.some((s) => s.id === reservedSeatObj.id)) return prev
+          return [reservedSeatObj, ...prev]
+        })
+      } else if (seats.length === 0) {
         setPhase('error')
         setErrorMessage(
           'No free seats are currently available in the library. All seats are occupied or under maintenance.'
@@ -244,13 +266,12 @@ export function ScannerPage() {
       setIsSubmitting(true)
       setErrorMessage('')
 
-      // createLibraryEntrySession re-checks:
-      // 1. student active session state
-      // 2. selected seat status in Supabase (must be 'free')
-      // Then inserts public.library_sessions row and updates seat to 'occupied'
+      // createLibraryEntrySession creates the entry session, sets seat to occupied,
+      // and automatically fulfills the reservation if activeReservation is present
       const { session, seat } = await createLibraryEntrySession(
         scannedStudent.id,
-        selectedSeat.id
+        selectedSeat.id,
+        activeReservation?.id
       )
 
       const entryTime = session.entryTime || new Date().toISOString()
@@ -387,16 +408,30 @@ export function ScannerPage() {
 
           {/* Seat Selection & Entry Option */}
           {!isStudentInside && phase === 'verified' && !isStudentInactive && (
-            <SeatSelection
-              seats={freeSeats}
-              selectedSeat={selectedSeat}
-              section={section}
-              isSubmitting={isSubmitting}
-              isLoadingSeats={isLoadingSeats}
-              onSectionChange={setSection}
-              onSelect={setSelectedSeat}
-              onConfirm={handleConfirmEntry}
-            />
+            <div className="space-y-4">
+              {activeReservation && (
+                <div className="flex items-center gap-2.5 rounded-xl border border-indigo-200 bg-indigo-50/80 p-3.5 text-xs text-indigo-900 shadow-xs">
+                  <Sparkles className="h-4 w-4 shrink-0 text-indigo-600" />
+                  <span>
+                    <strong>Active Reservation Recognized:</strong> Student reserved{' '}
+                    <strong>
+                      Seat {activeReservation.seatNumber} (Section {activeReservation.section})
+                    </strong>
+                    . This seat has been automatically pre-selected.
+                  </span>
+                </div>
+              )}
+              <SeatSelection
+                seats={freeSeats}
+                selectedSeat={selectedSeat}
+                section={section}
+                isSubmitting={isSubmitting}
+                isLoadingSeats={isLoadingSeats}
+                onSectionChange={setSection}
+                onSelect={setSelectedSeat}
+                onConfirm={handleConfirmEntry}
+              />
+            </div>
           )}
 
           {/* Success Confirmation */}

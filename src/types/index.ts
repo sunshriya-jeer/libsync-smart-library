@@ -19,9 +19,9 @@ export interface StatMetric {
   accentColor?: string
 }
 
-export type SeatStatus = 'free' | 'occupied' | 'maintenance'
+export type SeatStatus = 'free' | 'occupied' | 'maintenance' | 'reserved'
 
-export type LibrarySeatStatus = 'free' | 'occupied' | 'maintenance'
+export type LibrarySeatStatus = 'free' | 'occupied' | 'maintenance' | 'reserved'
 
 export interface LibrarySeat {
   id: string
@@ -99,6 +99,7 @@ export interface Student {
   updated_at?: string
   lastVisit?: string
   college_barcode: string | null
+  profile_id?: string | null
 }
 
 export interface StudentRow {
@@ -114,6 +115,7 @@ export interface StudentRow {
   created_at: string
   updated_at: string
   college_barcode: string | null
+  profile_id?: string | null
 }
 
 export interface SeatRow {
@@ -139,3 +141,33 @@ export interface LibrarySessionRow {
 }
 
 export type ScanAction = 'entry' | 'exit'
+
+export type ReservationStatus = 'reserved' | 'fulfilled' | 'expired' | 'cancelled'
+
+export interface LibraryReservationRow {
+  id: string
+  student_id: string
+  seat_id: string
+  reserved_at: string
+  expires_at: string | null
+  status: ReservationStatus
+  fulfilled_at: string | null
+  cancelled_at: string | null
+  created_at: string
+  seats?: SeatRow | null
+  students?: StudentRow | null
+}
+
+export interface LibraryReservation {
+  id: string
+  studentId: string
+  seatId: string
+  seatNumber?: string
+  section?: 'A' | 'B' | 'C' | 'D'
+  reservedAt: string
+  expiresAt: string
+  status: ReservationStatus
+  fulfilledAt?: string | null
+  cancelledAt?: string | null
+  createdAt: string
+}

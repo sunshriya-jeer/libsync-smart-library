@@ -13,8 +13,6 @@ import {
   BookOpenCheck,
 } from 'lucide-react'
 import { cn } from '../../utils/cn'
-import { INITIAL_MOCK_SEATS } from '../seats/mockSeats'
-import { INITIAL_MOCK_STUDENTS } from '../students/mockStudents'
 import { useAuth } from '../../hooks/useAuth'
 import { useNavigate } from 'react-router-dom'
 
@@ -34,13 +32,13 @@ const NAV_LINKS = [
     name: 'Students',
     path: '/students',
     icon: Users,
-    badge: String(INITIAL_MOCK_STUDENTS.filter((student) => student.status === 'inside').length),
+    badge: undefined,
   },
   {
     name: 'Seats',
     path: '/seats',
     icon: Armchair,
-    badge: `${INITIAL_MOCK_SEATS.filter((seat) => seat.status === 'free').length} free`,
+    badge: undefined,
   },
   {
     name: 'Scanner',
@@ -190,12 +188,12 @@ export function Sidebar({ className, onNavigate }: SidebarProps) {
         <div className="flex items-center justify-between font-medium text-slate-700 mb-1">
           <span className="flex items-center gap-1.5">
             <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
-            Local Library State
+            Library System Status
           </span>
           <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
         </div>
         <p className="text-slate-500 text-[11px] leading-relaxed">
-          Local seat snapshot: {INITIAL_MOCK_SEATS.filter((seat) => seat.status === 'occupied').length}/{INITIAL_MOCK_SEATS.length} occupied.
+          Real-time database synchronization active.
         </p>
       </div>
 

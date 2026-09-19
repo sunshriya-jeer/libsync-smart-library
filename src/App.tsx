@@ -3,6 +3,7 @@ import { AuthProvider, useAuth, type AuthRole } from './hooks/useAuth'
 import { AppLayout } from './components/layout/AppLayout'
 import { StudentLayout } from './components/layout/StudentLayout'
 import { LoginPage } from './pages/LoginPage'
+import { RegisterPage } from './pages/RegisterPage'
 import { ResetPasswordPage } from './pages/ResetPasswordPage'
 import { DashboardPage } from './pages/DashboardPage'
 import { LibrarianDashboardPage } from './pages/LibrarianDashboardPage'
@@ -24,6 +25,8 @@ export function App() {
         <Routes>
           {/* Public Auth Routes */}
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
+          <Route path="/signup" element={<Navigate to="/register" replace />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
 
           {/* Admin & Librarian Operational Experience */}

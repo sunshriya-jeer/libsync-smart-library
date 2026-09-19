@@ -19,7 +19,7 @@ export function mapDatabaseStatusToSeatStatus(status: string): LibrarySeatStatus
     return 'maintenance'
   }
   if (normalized === 'reserved') {
-    return 'free'
+    return 'reserved'
   }
   return 'free'
 }

@@ -1,7 +1,9 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { BookOpenCheck, Home, QrCode, Armchair, History, LogOut, User } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
+import { fetchCurrentStudent } from '../../services/studentService'
+import type { Student } from '../../types'
 import { cn } from '../../utils/cn'
 
 const STUDENT_NAV_ITEMS = [
@@ -13,8 +15,23 @@ const STUDENT_NAV_ITEMS = [
 
 export function StudentLayout() {
   const { profile, session, signOut } = useAuth()
+  const [student, setStudent] = useState<Student | null>(null)
   const [isSigningOut, setIsSigningOut] = useState(false)
   const navigate = useNavigate()
+
+  useEffect(() => {
+    let isMounted = true
+    fetchCurrentStudent()
+      .then((data) => {
+        if (isMounted && data) setStudent(data)
+      })
+      .catch(() => {
+        // Fallback to auth profile
+      })
+    return () => {
+      isMounted = false
+    }
+  }, [])
 
   const handleLogout = async () => {
     setIsSigningOut(true)
@@ -25,7 +42,8 @@ export function StudentLayout() {
     }
   }
 
-  const studentDisplayName = profile?.full_name || session?.user.email?.split('@')[0] || 'Student'
+  const studentDisplayName = student?.fullName || student?.full_name || profile?.full_name || session?.user.email?.split('@')[0] || 'Student'
+  const studentSubtitle = student?.student_id ? `${student.student_id}` : 'Library Pass'
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900 font-sans pb-20 md:pb-0">
@@ -80,7 +98,7 @@ export function StudentLayout() {
             </div>
             <div className="hidden sm:block text-left text-xs">
               <p className="font-semibold text-slate-800 leading-tight truncate max-w-[120px]">{studentDisplayName}</p>
-              <p className="text-[10px] text-slate-400">Library Pass</p>
+              <p className="text-[10px] font-mono text-slate-400">{studentSubtitle}</p>
             </div>
           </div>
 

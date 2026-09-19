@@ -9,7 +9,7 @@ export function QuickScanCard() {
   const [selectedMode, setSelectedMode] = useState<'checkin' | 'seat' | 'checkout'>('checkin')
 
   return (
-    <Card className="h-full flex flex-col justify-between">
+    <Card className="flex flex-col justify-between">
       <CardHeader
         title="Quick Scan"
         subtitle="Rapid QR entry for student check-ins and seat assignment"
@@ -97,7 +97,7 @@ export function QuickScanCard() {
           </div>
           <div className="flex items-center gap-2 p-2 rounded-lg bg-slate-50 border border-slate-100">
             <RefreshCw className="w-4 h-4 text-indigo-600 shrink-0" />
-            <span className="truncate">Updates local seat map</span>
+            <span className="truncate">Updates live seat map</span>
           </div>
         </div>
 

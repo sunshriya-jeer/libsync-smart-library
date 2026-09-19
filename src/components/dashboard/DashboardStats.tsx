@@ -1,66 +1,142 @@
-import { Users, Armchair, UserCheck, Activity } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Users, Armchair, UserCheck, BookOpen } from 'lucide-react'
 import { StatCard } from '../ui/StatCard'
-import { INITIAL_MOCK_SEATS } from '../seats/mockSeats'
-import { INITIAL_MOCK_STUDENTS } from '../students/mockStudents'
+import { fetchSeats } from '../../services/seatService'
+import { fetchLibrarySessions } from '../../services/sessionService'
 
-export function DashboardStats() {
-  const studentsInside = INITIAL_MOCK_STUDENTS.filter((student) => student.status === 'inside').length
-  const availableSeats = INITIAL_MOCK_SEATS.filter((seat) => seat.status === 'free').length
-  const occupiedSeats = INITIAL_MOCK_SEATS.filter((seat) => seat.status === 'occupied').length
-  const totalSeats = INITIAL_MOCK_SEATS.length
+export interface DashboardStatsProps {
+  studentsInside?: number
+  availableSeats?: number
+  occupiedSeats?: number
+  totalSeats?: number
+  todayVisits?: number
+  isLoading?: boolean
+}
+
+export function DashboardStats({
+  studentsInside: propStudentsInside,
+  availableSeats: propAvailableSeats,
+  occupiedSeats: propOccupiedSeats,
+  totalSeats: propTotalSeats,
+  todayVisits: propTodayVisits,
+  isLoading: propIsLoading,
+}: DashboardStatsProps = {}) {
+  // If props are not provided, fetch real data as fallback (e.g. for Admin DashboardPage)
+  const hasProps = propTotalSeats !== undefined || propStudentsInside !== undefined
+
+  const [internalSeats, setInternalSeats] = useState<{
+    total: number
+    free: number
+    occupied: number
+  }>({ total: 0, free: 0, occupied: 0 })
+  const [internalInside, setInternalInside] = useState(0)
+  const [internalVisits, setInternalVisits] = useState(0)
+  const [internalLoading, setInternalLoading] = useState(!hasProps)
+
+  useEffect(() => {
+    if (hasProps) return
+
+    let isMounted = true
+
+    Promise.allSettled([fetchSeats(), fetchLibrarySessions()]).then(([seatsRes, sessionsRes]) => {
+      if (!isMounted) return
+
+      if (seatsRes.status === 'fulfilled') {
+        const seats = seatsRes.value
+        setInternalSeats({
+          total: seats.length,
+          free: seats.filter((s) => s.status === 'free').length,
+          occupied: seats.filter((s) => s.status === 'occupied').length,
+        })
+      }
+
+      if (sessionsRes.status === 'fulfilled') {
+        const sessions = sessionsRes.value
+        const active = sessions.filter((s) => s.status === 'active' || !s.exitTime).length
+        const today = new Date()
+        const visits = sessions.filter((s) => {
+          if (!s.entryTime) return false
+          const d = new Date(s.entryTime)
+          return (
+            d.getFullYear() === today.getFullYear() &&
+            d.getMonth() === today.getMonth() &&
+            d.getDate() === today.getDate()
+          )
+        }).length
+        setInternalInside(active)
+        setInternalVisits(visits)
+      }
+
+      setInternalLoading(false)
+    })
+
+    return () => {
+      isMounted = false
+    }
+  }, [hasProps])
+
+  const isLoading = propIsLoading ?? internalLoading
+  const totalSeats = propTotalSeats ?? internalSeats.total
+  const availableSeats = propAvailableSeats ?? internalSeats.free
+  const occupiedSeats = propOccupiedSeats ?? internalSeats.occupied
+  const studentsInside = propStudentsInside ?? internalInside
+  const todayVisits = propTodayVisits ?? internalVisits
+
+  const freePercent = totalSeats > 0 ? Math.round((availableSeats / totalSeats) * 100) : 0
+  const occPercent = totalSeats > 0 ? Math.round((occupiedSeats / totalSeats) * 100) : 0
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
-      {/* 1. Students Inside */}
+      {/* 1. Active Sessions / Students Inside */}
       <StatCard
-        title="Students Inside"
-        value={studentsInside}
+        title="Active Sessions"
+        value={isLoading ? '—' : studentsInside}
         icon={<Users className="w-5 h-5 text-indigo-600" />}
         iconBgClass="bg-indigo-50"
         trend={{
-          value: '+12% vs last hour',
-          isPositive: true,
+          value: isLoading ? 'Syncing...' : `${studentsInside} active`,
+          isPositive: studentsInside > 0,
         }}
-        description="Current local occupancy"
+        description="Students currently in library"
       />
 
       {/* 2. Available Seats */}
       <StatCard
         title="Available Seats"
-        value={availableSeats}
+        value={isLoading ? '—' : availableSeats}
         icon={<Armchair className="w-5 h-5 text-emerald-600" />}
         iconBgClass="bg-emerald-50"
         trend={{
-          value: `${Math.round((availableSeats / totalSeats) * 100)}% free`,
+          value: isLoading ? 'Syncing...' : `${freePercent}% free`,
           isNeutral: true,
         }}
-        description="Available across Sections A-D"
+        description="Available for check-in"
       />
 
       {/* 3. Occupied Seats */}
       <StatCard
         title="Occupied Seats"
-        value={occupiedSeats}
+        value={isLoading ? '—' : occupiedSeats}
         icon={<UserCheck className="w-5 h-5 text-amber-600" />}
         iconBgClass="bg-amber-50"
         trend={{
-          value: `${Math.round((occupiedSeats / totalSeats) * 100)}% full`,
+          value: isLoading ? 'Syncing...' : `${occPercent}% full`,
           isNeutral: true,
         }}
-        description={`${totalSeats} total library seats`}
+        description="Currently occupied desks"
       />
 
-      {/* 4. Today's Visits */}
+      {/* 4. Total Seats */}
       <StatCard
-        title="Today's Visits"
-        value="384"
-        icon={<Activity className="w-5 h-5 text-sky-600" />}
+        title="Total Seats"
+        value={isLoading ? '—' : totalSeats}
+        icon={<BookOpen className="w-5 h-5 text-sky-600" />}
         iconBgClass="bg-sky-50"
         trend={{
-          value: '+18% vs yesterday',
-          isPositive: true,
+          value: isLoading ? 'Syncing...' : `${todayVisits} today`,
+          isNeutral: true,
         }}
-        description="Cumulative check-ins recorded"
+        description="Total library capacity"
       />
     </div>
   )
