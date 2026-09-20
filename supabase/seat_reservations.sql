@@ -10,7 +10,9 @@ ALTER TABLE public.seats ADD CONSTRAINT seats_status_check
 
 -- 2. Table Grants for public.library_reservations
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.library_reservations TO authenticated;
-GRANT SELECT ON public.library_reservations TO anon;
+-- Anonymous access revoked
+REVOKE SELECT ON public.library_reservations FROM anon;
+REVOKE ALL ON public.library_reservations FROM anon;
 
 -- 3. Row Level Security Policies on public.library_reservations
 ALTER TABLE public.library_reservations ENABLE ROW LEVEL SECURITY;
